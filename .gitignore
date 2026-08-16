@@ -1,0 +1,16 @@
+# Resolved, not authored.
+.dart_tool/
+
+# This package is never compiled to anything, so which versions it resolved against is not part
+# of what shipped. pubspec.lock came across with the history of the directory this repository
+# was split out of, and it goes with the split.
+pubspec.lock
+
+# The path override that points at a framework checkout beside this one. Whoever has both writes
+# their own; the git dependency below is what everyone else resolves.
+pubspec_overrides.yaml
+
+# Agent instructions. Loaded from disk by whichever harness opens this repository, and never
+# tracked: they are ours, and this repository is meant to be cloned and used by anybody.
+CLAUDE.md
+AGENTS.md

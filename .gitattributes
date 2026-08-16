@@ -1,0 +1,17 @@
+# The audits run on Linux in the gate and are also edited on Windows. Enforce LF so what a check
+# reads there reads the way it reads here, and so the line-endings audit this package itself
+# ships judges the same bytes everywhere.
+
+# Normalize all text to LF in the repo AND on checkout, on every platform.
+* text=auto eol=lf
+
+# Files that MUST be LF, whatever git makes of their content.
+*.dart    text eol=lf
+*.yaml    text eol=lf
+*.yml     text eol=lf
+*.words   text eol=lf
+
+# Binary artifacts — never touch line endings.
+*.tgz   binary
+*.gz    binary
+*.png   binary

@@ -23,8 +23,16 @@ environment:
 dependencies:
   # The registry, the steps and the three modes an audit drives, plus the fakes it drives them
   # against — a step under probe meets a fake machine, not a real one.
+  # NAMED BY GIT REF, LIKE EVERYBODY ELSE, AND THAT IS WHY THIS REPOSITORY EXISTS. While these audits
+  # sat inside the framework's own repository this said `path: ..`, and pub resolved that inside
+  # whatever checkout it had fetched — recording a specific COMMIT. Every consumer asks for the same
+  # framework at `ref: master`, a REF, and pub treats a commit and a ref as two different sources. So
+  # a package could depend on the framework or on these audits and never on both, while every
+  # package here needs both. Nothing resolved from a clone at all.
   ansiwise_api:
-    path: ..
+    git:
+      url: https://github.com/simetrixch/ansiwise-api.git
+      ref: master
   path: ^1.9.1
   # A DEPENDENCY rather than a dev dependency, because audits.dart imports it: the suite that drives
   # each audit and plants its counter-probe lives here, so that whoever runs it does not carry a copy
