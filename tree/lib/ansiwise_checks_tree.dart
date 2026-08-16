@@ -12,6 +12,7 @@
 /// one, so nothing needs both by name.
 library;
 
+export 'src/analysis.dart';
 export 'src/declared_checks.dart';
 export 'src/directive_case.dart';
 export 'src/exec_confinement.dart';

@@ -1,0 +1,23 @@
+# Every check this package makes, and the file that carries it.
+#
+# WHY THIS FILE EXISTS. `dart test` discovers whatever is on disk and reports whether any of it
+# failed. Delete a check file and nothing fails: the check is simply not there, and the run prints
+# that every check is green. It is worse than a missing test, because a check and its counter-probe
+# live in the same file — the thing that would have noticed goes with the thing it was watching.
+#
+# So the suite does not ask the disk what it checks. It is told here, and
+# test/checks/declared_checks_test.dart holds the disk against this file, naming whatever vanished.
+#
+# FORMAT. `<check>: <file, relative to this file>`, one per line, the reason on the comment line
+# directly above it. It is read line by line and the reader imports nothing but dart:io, because the
+# same reading is done by gate programs that have to start on a fresh clone where no package has been
+# resolved.
+#
+# ADDING A CHECK MEANS ADDING A LINE. A check file that is not declared here is reported too: an
+# undeclared check is one nobody agreed to, and it is how a suite grows a file that judges nothing.
+
+# The analyzer with infos and warnings fatal and the formatter find nothing to change in this
+# package's own tree.
+analysis: test/checks/analysis_test.dart
+# This file agrees with the suite on disk, and the refusal that enforces it can really go red.
+declared-checks: test/checks/declared_checks_test.dart

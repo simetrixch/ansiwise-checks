@@ -6,6 +6,7 @@
 /// each scan really goes red. It reaches `package:test`, which is why it is a library of its own.
 library;
 
+export 'src/audits/analysis_audit.dart';
 export 'src/audits/case_sensitivity_audit.dart';
 export 'src/audits/declared_checks_audit.dart';
 export 'src/audits/exec_confinement_audit.dart';
