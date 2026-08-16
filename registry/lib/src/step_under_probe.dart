@@ -49,6 +49,11 @@ Arguments plausibleArguments(List<ArgumentSpec> specs) {
           ArgumentKind.integer => 1,
           ArgumentKind.flag => false,
           ArgumentKind.textList => const <String>['x'],
+          // A mapping is planted with one entry naming one answer, because that is the smallest
+          // shape every step declaring one accepts. A step wanting more says so in its own refusal.
+          ArgumentKind.mapping => const <String, Object?>{
+            'X': <String, Object?>{'answer': plausibleText},
+          },
         };
   }
   return Arguments(values);
