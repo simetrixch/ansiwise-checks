@@ -16,7 +16,7 @@ library;
 
 import 'package:ansiwise_api/ansiwise_api.dart';
 
-import 'installation_programs.dart';
+import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';
 import 'step_under_probe.dart';
 
 /// What a probe will hand the steps, and what it could not read.

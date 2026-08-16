@@ -13,9 +13,8 @@
 /// be relative to the repository root — which is what the record's reader resolves it against.
 library;
 
-import 'finding.dart';
+import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';
 import 'registry_reading.dart';
-import 'source_tree.dart';
 
 /// Where a step class belongs, relative to the repository root.
 const String stepsDirectory = 'lib/src/steps';

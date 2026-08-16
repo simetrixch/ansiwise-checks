@@ -1,0 +1,28 @@
+# The audits that decide something by reading a tree of files.
+#
+# ITS DEPENDENCY LIST IS THE POINT: nothing of this organisation is in it, and nothing may be.
+# The framework may not reach anything of ours — that rule is what keeps a unit from becoming part
+# of the core through the back door — and the framework must still be able to audit its own tree.
+# Both hold only while these audits sit BESIDE the framework instead of above it.
+#
+# The half that drives a registry, and therefore knows the framework's types, is the package next
+# door.
+name: ansiwise_checks_tree
+description: The audits that read a tree of files, depending on nothing of this organisation.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  path: ^1.9.1
+  # A DEPENDENCY rather than a dev dependency, because audits.dart imports it: the suite that
+  # drives each audit and plants its counter-probe lives here, so whoever runs it does not carry a
+  # copy. This package is itself only ever a dev dependency, so nothing ships with a test
+  # framework behind it.
+  test: ^1.31.2
+  yaml: ^3.1.3
+
+dev_dependencies:
+  lints: ^6.1.0

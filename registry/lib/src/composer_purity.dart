@@ -19,9 +19,8 @@
 /// tool.
 library;
 
-import 'finding.dart';
+import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';
 import 'registry_completeness.dart';
-import 'source_tree.dart';
 
 /// The step files of [tree], sorted.
 ///

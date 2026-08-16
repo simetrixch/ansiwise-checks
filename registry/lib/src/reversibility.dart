@@ -17,10 +17,9 @@
 /// may be composed: [RegistryReading] reports what the step would actually show.
 library;
 
-import 'finding.dart';
+import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';
 import 'registry_completeness.dart';
 import 'registry_reading.dart';
-import 'source_tree.dart';
 
 /// What an operator learns nothing from.
 ///

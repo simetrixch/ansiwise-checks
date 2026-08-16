@@ -5,7 +5,7 @@ import 'package:ansiwise_api/ansiwise_api.dart';
 import 'package:test/test.dart';
 
 import '../declared_answers.dart';
-import '../installation_programs.dart';
+import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';
 import '../step_under_probe.dart';
 
 /// Runs the declared-answers audit over [registry].

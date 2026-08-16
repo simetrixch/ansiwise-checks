@@ -9,7 +9,7 @@ library;
 import 'package:ansiwise_api/ansiwise_api.dart';
 import 'package:ansiwise_api/testing.dart';
 
-import 'finding.dart';
+import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';
 
 /// Arranges [FakeShell], [FakeFiles] and [FakeHttp] for one step.
 ///

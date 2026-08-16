@@ -22,7 +22,7 @@ import 'package:ansiwise_api/ansiwise_api.dart';
 import 'package:ansiwise_api/testing.dart';
 
 import 'dry_safety.dart';
-import 'finding.dart';
+import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';
 import 'step_under_probe.dart';
 
 /// What running one step twice showed.

@@ -4,11 +4,10 @@ library;
 import 'package:ansiwise_api/ansiwise_api.dart';
 import 'package:test/test.dart';
 
-import '../finding.dart';
+import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';
 import '../registry_completeness.dart';
 import '../registry_reading.dart';
 import '../reversibility.dart';
-import '../source_tree.dart';
 
 /// Runs the reversibility audit over [registry] and [tree].
 ///

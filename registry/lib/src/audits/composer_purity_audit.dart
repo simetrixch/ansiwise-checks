@@ -4,9 +4,8 @@ library;
 import 'package:test/test.dart';
 
 import '../composer_purity.dart';
-import '../finding.dart';
+import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';
 import '../registry_completeness.dart';
-import '../source_tree.dart';
 
 /// Runs the composer-purity audit over [tree], or over the repository this suite sits in.
 ///

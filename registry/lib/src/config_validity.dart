@@ -18,7 +18,7 @@ library;
 
 import 'package:ansiwise_api/ansiwise_api.dart';
 
-import 'finding.dart';
+import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';
 
 /// What the loader and the resolver said about one program file.
 sealed class ProgramOutcome {

@@ -13,7 +13,7 @@ library;
 
 import 'package:ansiwise_api/ansiwise_api.dart';
 
-import 'finding.dart';
+import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';
 import 'step_under_probe.dart';
 
 /// Which of the three kinds a step declared itself to be.
