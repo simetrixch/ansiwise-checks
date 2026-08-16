@@ -22,35 +22,46 @@ library;
 
 import 'dart:io';
 
-/// The environment variable that names the installation tree, overriding the fallback.
+/// The environment variable that names the installation tree, overriding the search.
 const String installationVariable = 'ANSIWISE_INSTALLATION';
 
 /// Where the programs stand inside an installation tree.
 const String installationPrograms = 'ansiwise/programs';
 
-/// The installation tree, as the environment names it or as a checkout of it sits beside this one.
-///
-/// The fallback is one relative path, taken from the directory `dart test` runs in — which is the
-/// package root, and every package of every repository here sits at the same depth below the
-/// directory the checkouts share.
-String get installationTree =>
-    Platform.environment[installationVariable] ?? '../../../digitaplatform/digita-cloud';
+/// Where the installation's checkout stands below the directory the checkouts share.
+const String _installationCheckout = 'digitaplatform/digita-cloud';
 
-/// [installationTree], proven to be there.
+/// The installation tree, as the environment names it or as a checkout found above this suite.
+///
+/// The packages that ask are not all at the same depth below the directory the checkouts share — a
+/// plugin sits two directories inside its repository, a composition root only one — so the checkout
+/// is found by walking upward from the directory the suite runs in, rather than by one relative
+/// path that is only true at a single depth.
 String get installationRoot {
-  if (!Directory('$installationTree/$installationPrograms').existsSync()) {
-    throw StateError(
-      'no programs at $installationTree/$installationPrograms — the programs of an installation '
-      'live in its own repository, and these audits read that tree for the kinds and defaults its '
-      'answers are declared with. Clone it beside this one, or set $installationVariable to where '
-      'it is.',
-    );
+  if (Platform.environment[installationVariable] case final String named) {
+    if (!Directory('$named/$installationPrograms').existsSync()) {
+      throw StateError(
+        'no programs at $named/$installationPrograms — $installationVariable names a tree that '
+        'does not hold an installation.',
+      );
+    }
+    return named;
   }
-  return installationTree;
+  for (Directory above = Directory.current.absolute; ; above = above.parent) {
+    final String candidate = '${above.path}/$_installationCheckout';
+    if (Directory('$candidate/$installationPrograms').existsSync()) {
+      return candidate;
+    }
+    if (above.parent.path == above.path) {
+      throw StateError(
+        'no checkout of $_installationCheckout above ${Directory.current.path} holds '
+        '$installationPrograms — the programs of an installation live in its own repository, and '
+        'these audits read that tree for the kinds and defaults its answers are declared with. '
+        'Clone it beside this repository, or set $installationVariable to where it is.',
+      );
+    }
+  }
 }
 
 /// The directory the programs of the installation stand in, proven to be there.
 String get installationProgramsRoot => '$installationRoot/$installationPrograms';
-
-/// The program file named [name], as a path a test can open.
-String programAt(String name) => '$installationProgramsRoot/$name';

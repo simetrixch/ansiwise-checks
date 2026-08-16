@@ -65,6 +65,15 @@ final class ProgramReading {
     for (final ProgramRefused refused in outcomes.whereType<ProgramRefused>())
       for (final String problem in refused.problems) Finding(refused.file, problem),
   ];
+
+  /// How many steps those files name in total.
+  ///
+  /// The denominator of the check: a run that reports no refusal AND a count of what it read is a
+  /// run that can be told apart from one that read nothing.
+  int get stepCount => outcomes.whereType<ProgramResolved>().fold(
+    0,
+    (int total, ProgramResolved resolved) => total + resolved.steps,
+  );
 }
 
 /// The check itself, over a directory and a registry it is given.
