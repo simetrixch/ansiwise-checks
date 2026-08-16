@@ -1,2 +1,2 @@
 # The same rule set the framework holds itself to, so an audit is held to what it audits.
-include: package:ansiwise_api/analysis_options.yaml
+include: package:ansiwise_checks_tree/analysis_options.yaml
