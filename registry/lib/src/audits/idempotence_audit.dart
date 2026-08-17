@@ -263,7 +263,7 @@ final class WorksThroughACommand extends ReversibleStep<bool> {
   @override
   Future<CheckResult> check(StepContext context) async {
     final CommandResult marker = await context.shell.run(
-      const Command.observing('test', <String>['-e', path]),
+      const Command.observing('test', arguments: <String>['-e', path]),
     );
     return marker.trimmed == 'there'
         ? const CheckResult.satisfied('the marker is there')
@@ -281,7 +281,7 @@ final class WorksThroughACommand extends ReversibleStep<bool> {
   @override
   Future<bool> capture(StepContext context) async {
     final CommandResult marker = await context.shell.run(
-      const Command.observing('test', <String>['-e', path]),
+      const Command.observing('test', arguments: <String>['-e', path]),
     );
     return marker.trimmed == 'there';
   }
