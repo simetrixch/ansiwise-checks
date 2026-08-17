@@ -222,6 +222,44 @@ void auditRegistryCompleteness(Registry registry, {SourceTree? tree}) {
       );
     });
 
+    // The GENERIC shape. It holds no instance until an installation binds it, so its class cannot be
+    // read off the entry the way an instance's can — read that way it comes back as `Null`, the
+    // entry is held against a source line that could never declare it, and every package registering
+    // one goes red for a defect that is in the check. Planted because the shape has to be shown to
+    // work in a package that registers no generic condition of its own.
+    test('a generic predicate is built from what it declares, and its class is read', () {
+      final RegistryCompleteness onTarget = RegistryCompleteness(
+        tree: plantedPredicateTree,
+        reading: RegistryReading.of(_registryOfGeneric('$_plantedPredicatePath:2')),
+      );
+      expect(
+        RegistryReading.of(
+          _registryOfGeneric('$_plantedPredicatePath:2'),
+        ).predicates.single.className,
+        'PlantedPredicate',
+        reason: 'read off the unbound entry this is "Null", and the source check then cannot pass',
+      );
+      expect(about(onTarget.findings, 'planted_predicate'), isEmpty);
+    });
+
+    test('a generic predicate that cannot be built is reported rather than passed over', () {
+      final RegistryReading reading = RegistryReading.of(
+        _registryOfGeneric('$_plantedPredicatePath:2', create: _refuseToBuild),
+      );
+      expect(
+        reading.predicates,
+        isEmpty,
+        reason: 'nothing was built, so nothing may be counted as measured',
+      );
+      expect(
+        about(reading.problems, 'planted_predicate'),
+        isNotEmpty,
+        reason:
+            'a condition that reads a value it never declared throws, and a silent drop would leave '
+            'the source of a real predicate unmeasured while the check stayed green',
+      );
+    });
+
     test('a predicate that describes nothing is reported', () {
       final RegistryCompleteness silent = RegistryCompleteness(
         tree: plantedPredicateTree,
@@ -275,6 +313,45 @@ Registry _registryOfPredicate(
     ),
   },
 );
+
+/// A registry holding one GENERIC predicate, claiming to be declared at [source].
+///
+/// [create] is what the entry's factory does. The default builds the planted predicate; a probe
+/// hands one that throws, which is what a condition reading a value it never declared does.
+Registry _registryOfGeneric(String source, {Predicate Function(Arguments values)? create}) =>
+    Registry(
+      steps: const <StepName, RegisteredStep>{},
+      predicates: <PredicateName, RegisteredPredicate>{
+        const PredicateName('planted_predicate'): RegisteredPredicate.taking(
+          name: const PredicateName('planted_predicate'),
+          source: source,
+          create: create ?? _plantGeneric,
+          describes: 'whether the planted key is on in the planted file',
+          arguments: const <ArgumentSpec>[
+            ArgumentSpec(
+              name: 'file',
+              kind: ArgumentKind.text,
+              describes: 'the file the planted condition reads',
+            ),
+          ],
+        ),
+      },
+    );
+
+/// What the planted generic entry builds: the value it was told is read, and then dropped.
+///
+/// Reading it is the point. A factory that ignored its values would be built just as happily by a
+/// probe handing none, and the finding above would never be reachable.
+Predicate _plantGeneric(Arguments values) {
+  values.text('file');
+  return const PlantedPredicate();
+}
+
+/// A factory that reads a value its entry does not declare, the way a mistaken one would.
+Predicate _refuseToBuild(Arguments values) {
+  values.text('a_value_this_entry_never_declared');
+  return const PlantedPredicate();
+}
 
 /// The declaration the planted predicate's source has to point at.
 ///

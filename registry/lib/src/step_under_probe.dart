@@ -80,6 +80,39 @@ Step? buildStep(RegisteredStep entry, void Function(Finding failure) onFailure) 
   }
 }
 
+/// The predicate [entry] holds, or null when it cannot be built at all.
+///
+/// TWO SHAPES, and the second is the one that cannot simply be read. A condition that reads nothing
+/// is registered as an instance and is handed straight back. A GENERIC one is registered as a
+/// factory plus the values it must be told, and it holds no instance until an installation binds it
+/// — so it is bound here to [plausibleArguments] over its own declaration, which is what [buildStep]
+/// does one function up and for the same reason: a check reading the unbound entry gets `Null` and
+/// then measures that.
+///
+/// The binding is thrown away with the values. What is wanted is the CLASS, and a condition built
+/// from its own declared kinds is the class its factory builds whatever the values were.
+///
+/// [onFailure] is given a finding naming the predicate and the reason. Every throwable is caught,
+/// including an [Error]: a condition that reads a value it never declared throws [ArgumentError],
+/// and that is the defect worth reporting rather than one entry ending the walk.
+Predicate? buildPredicate(RegisteredPredicate entry, void Function(Finding failure) onFailure) {
+  if (entry.predicate case final Predicate instance) {
+    return instance;
+  }
+  try {
+    return entry.boundTo(entry.name, plausibleArguments(entry.arguments)).predicate;
+  } on Object catch (failure) {
+    onFailure(
+      Finding(
+        entry.name.value,
+        'could not be built from the values it declares itself, so nothing about it was '
+        'measured — $failure',
+      ),
+    );
+    return null;
+  }
+}
+
 /// What a step said while a check was running it.
 ///
 /// Kept rather than printed: a step's own notes would otherwise land in the middle of a test run's

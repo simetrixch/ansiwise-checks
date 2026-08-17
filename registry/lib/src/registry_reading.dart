@@ -79,11 +79,18 @@ final class PredicateEntry {
   /// Where the predicate is declared, as `path:line` relative to the repository root.
   final String source;
 
-  /// The class the registered instance turned out to be.
+  /// The class the registered predicate turned out to be.
   ///
-  /// A predicate is registered as one instance rather than as a factory, so several entries share a
-  /// class and therefore a source: `vault_enabled` and `idp_enabled` are both `StageToggle` with
-  /// different keys. The class is what says which declaration their source must point at.
+  /// A predicate comes in two shapes and the class is read out of both. One that reads nothing is
+  /// registered as an INSTANCE, and the class is read off it directly. A GENERIC one is registered
+  /// as a FACTORY plus the values it must be told, and it holds no instance at all until an
+  /// installation binds it — so it is built here from the values it declares itself, exactly the way
+  /// a step is. Reading the class off the unbound entry instead reports `Null`, and the entry is
+  /// then held against a source line that could never declare it.
+  ///
+  /// Several entries may share a class and therefore a source: a generic condition bound twice under
+  /// two names is the same code pointed at two different facts. The class is what says which
+  /// declaration their source must point at.
   final String className;
 
   /// What it asks about the machine, in one line, for the plan the operator reads.
@@ -143,11 +150,16 @@ final class RegistryReading {
           Finding(pair.key.value, 'the registry files the predicate "${entry.name.value}" here'),
         );
       }
+      final Predicate? predicate = buildPredicate(entry, problems.add);
+      if (predicate == null) {
+        continue;
+      }
+
       predicates.add(
         PredicateEntry(
           name: entry.name.value,
           source: entry.source,
-          className: entry.predicate.runtimeType.toString(),
+          className: predicate.runtimeType.toString(),
           describes: entry.describes,
         ),
       );
