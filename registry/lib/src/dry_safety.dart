@@ -131,7 +131,7 @@ final class DrySafety {
         pair.key,
         step,
         plausibleArguments(pair.value.arguments),
-        answers: answers,
+        answers: answersForProbe(answers, pair.value.arguments),
         // A step that measures does it inside the check this asks, and the sink refuses a name the
         // step's entry does not declare. Without the declaration here every such step would come
         // back as one whose check threw — a finding about this probe rather than about the step.

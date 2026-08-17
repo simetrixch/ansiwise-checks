@@ -59,6 +59,29 @@ Arguments plausibleArguments(List<ArgumentSpec> specs) {
   return Arguments(values);
 }
 
+/// [given] with an answer standing under every name the probe's own arguments point at.
+///
+/// **An argument of kind [ArgumentKind.answerName] holds the NAME of an answer, and a step reading
+/// it then reads that answer.** The probe fills such an argument with its own plausible text, so
+/// unless the same text also stands among the answers, every step of that shape fails to build —
+/// and the check reports a step that refused, which is a finding about this probe rather than about
+/// the step.
+///
+/// Measured: a step whose row names the answer holding a mailbox came back as "its plan threw: the
+/// step read an argument it did not declare", three layers away from the reason.
+Arguments answersForProbe(Arguments given, List<ArgumentSpec> specs) {
+  final Map<String, Object> planted = <String, Object>{
+    for (final String name in given.names)
+      if (given.raw(name) case final Object value) name: value,
+  };
+  for (final ArgumentSpec spec in specs) {
+    if (spec.kind == ArgumentKind.answerName) {
+      planted[plausibleText] = plausibleText;
+    }
+  }
+  return Arguments(planted);
+}
+
 /// The step [entry] builds from [plausibleArguments], or null when it cannot be built that way.
 ///
 /// [onFailure] is given a finding naming the step and the reason. Every throwable is caught,
