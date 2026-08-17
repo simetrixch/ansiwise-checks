@@ -1,0 +1,43 @@
+# What this package may never name, anywhere under lib/ and test/.
+#
+# THE TEST FOR A WORD: could a vendor with the same tools and a completely different product still
+# use this package with that word in it? The tools of this package are the Dart toolchain, YAML and
+# a tree of files on disk, and a name one of those tools gives its own things passes and stays off
+# this list. A name belonging to one product built with them fails and goes on it.
+#
+# THIS IS THE PACKAGE EVERY OTHER PACKAGE'S WORD SCAN RUNS THROUGH, which is why it carries a list
+# of its own. A name that leaks in here is inherited by every package that depends on this one,
+# without any of them writing it down, and no scan outside this repository reads these files.
+#
+# One word per line. Blank lines and lines beginning with # are ignored; everything else is matched
+# case-insensitively and word-anchored, so a longer name that merely contains a word is no
+# occurrence of it. A COMPOUND IS ITS OWN WORD for that reason: an organisation written one way in
+# a package name and another way in a repository URL needs a line for each spelling, which is why
+# two of the names below stand here twice, once bare and once with the ending a URL gives it.
+
+# The organisation behind this package and the products it builds, in each form a path, a package
+# name or a repository URL writes them.
+digita
+digitaplatform
+hostyour
+simetrix
+simetrixch
+
+# Those products' choices: the distribution they run their clusters on, the components they deploy,
+# the vendors they rent from, and the name they gave their certificate issuer. None of these is a
+# tool of this package, which drives a compiler and a file tree and never a machine, so such a word
+# can only arrive here as an example somebody had in mind — which is the leak this scan is for.
+microk8s
+argocd
+tekton
+zot
+authentik
+cloudflare
+hetzner
+letsencrypt-prod
+
+# Those products' own domain words. Forbidden even where one of them reads as ordinary English:
+# this is a byte scan and cannot tell one product's entity from the plain noun, so the word is off
+# limits here and the sentence says "caller", or "the package that depends on this one", instead.
+tenant
+consumer

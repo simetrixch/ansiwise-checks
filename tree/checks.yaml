@@ -21,3 +21,7 @@
 analysis: test/checks/analysis_test.dart
 # This file agrees with the suite on disk, and the refusal that enforces it can really go red.
 declared-checks: test/checks/declared_checks_test.dart
+# This package names its tools and never an application of them. It is the package the word scan
+# itself lives in, so a product name here is inherited by every package that depends on it without
+# any of them writing it down, and nothing outside this repository reads these files.
+tool-purity: test/checks/tool_purity_test.dart

@@ -21,3 +21,7 @@
 analysis: test/checks/analysis_test.dart
 # This file agrees with the suite on disk, and the refusal that enforces it can really go red.
 declared-checks: test/checks/declared_checks_test.dart
+# This package names its tools and never an application of them. These audits are what every other
+# package's checks are made of, so a product name here travels to every package that runs them
+# without any of them writing it down, and nothing outside this repository reads these files.
+tool-purity: test/checks/tool_purity_test.dart
