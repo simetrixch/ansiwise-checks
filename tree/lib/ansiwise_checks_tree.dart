@@ -13,6 +13,7 @@
 library;
 
 export 'src/analysis.dart';
+export 'src/declared_arguments.dart';
 export 'src/declared_checks.dart';
 export 'src/directive_case.dart';
 export 'src/exec_confinement.dart';

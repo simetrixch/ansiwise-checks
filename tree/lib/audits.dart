@@ -12,4 +12,5 @@ export 'src/audits/declared_checks_audit.dart';
 export 'src/audits/exec_confinement_audit.dart';
 export 'src/audits/line_endings_audit.dart';
 export 'src/audits/naming_audit.dart';
+export 'src/audits/declared_arguments_audit.dart';
 export 'src/audits/word_purity_audit.dart';
