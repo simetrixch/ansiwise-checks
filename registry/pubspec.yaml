@@ -21,9 +21,10 @@ dependencies:
   # checkout pub fetched and recorded as a COMMIT, while every consumer names the framework at a
   # REF — and pub treats a commit and a ref as two different sources, so nothing resolved from a
   # clone at all.
-  ansiwise_api:
+  ansiwise_core:
     git:
-      url: https://github.com/simetrixch/ansiwise-api.git
+      url: https://github.com/simetrixch/ansiwise-core.git
+      path: core
       ref: master
   ansiwise_checks_tree:
     git:

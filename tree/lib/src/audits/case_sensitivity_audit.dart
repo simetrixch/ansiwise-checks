@@ -147,7 +147,7 @@ void auditCaseSensitivity({SourceTree? tree}) {
         SourceTree.planted(<String, String>{
           'lib/uses_others.dart':
               "import 'dart:io';\n"
-              "import 'package:ansiwise_api/ansiwise_api.dart';",
+              "import 'package:ansiwise_core/ansiwise_core.dart';",
         }),
       );
       expect(planted.directivesJudged, isEmpty);

@@ -18,8 +18,8 @@
 /// a ledger the test asserts against — only a fixture arranged for that particular step closes one.
 library;
 
-import 'package:ansiwise_api/ansiwise_api.dart';
-import 'package:ansiwise_api/testing.dart';
+import 'package:ansiwise_core/ansiwise_core.dart';
+import 'package:ansiwise_core/testing.dart';
 
 import 'dry_safety.dart';
 import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';

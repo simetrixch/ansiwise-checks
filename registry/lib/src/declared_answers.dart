@@ -14,7 +14,7 @@
 /// a probe silently falling back to a placeholder is the same defect wearing a different hat.
 library;
 
-import 'package:ansiwise_api/ansiwise_api.dart';
+import 'package:ansiwise_core/ansiwise_core.dart';
 
 import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';
 import 'step_under_probe.dart';

@@ -1,7 +1,7 @@
 /// The suite that drives [RegistryCompleteness] over one registry and tree, with its counter-probe.
 library;
 
-import 'package:ansiwise_api/ansiwise_api.dart';
+import 'package:ansiwise_core/ansiwise_core.dart';
 import 'package:test/test.dart';
 
 import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';

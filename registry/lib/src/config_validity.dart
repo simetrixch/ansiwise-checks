@@ -16,7 +16,7 @@
 /// wrong with a file at once, in the order the file reads, so a person fixing one runs it once.
 library;
 
-import 'package:ansiwise_api/ansiwise_api.dart';
+import 'package:ansiwise_core/ansiwise_core.dart';
 
 import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';
 

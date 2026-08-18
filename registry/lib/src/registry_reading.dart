@@ -11,7 +11,7 @@
 /// away — this would then report a name nobody wrote.
 library;
 
-import 'package:ansiwise_api/ansiwise_api.dart';
+import 'package:ansiwise_core/ansiwise_core.dart';
 
 import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';
 import 'step_under_probe.dart';
