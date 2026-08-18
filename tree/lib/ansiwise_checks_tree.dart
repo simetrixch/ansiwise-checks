@@ -22,5 +22,6 @@ export 'src/finding.dart';
 export 'src/installation_programs.dart';
 export 'src/line_endings.dart';
 export 'src/naming.dart';
+export 'src/shared_gate.dart';
 export 'src/source_tree.dart';
 export 'src/word_purity.dart';
