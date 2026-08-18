@@ -39,6 +39,39 @@ const String installationPrograms = 'ansiwise/programs';
 /// mistaken for.
 const int _searchDepth = 2;
 
+/// Whether an installation tree can be found at all, without refusing when it cannot.
+///
+/// **What this is for, and why a check may not simply pass without it.** Two suites read the
+/// programs of an INSTALLATION, and an installation lives in its own repository. A clone of this one
+/// standing alone has no such tree, so those suites cannot run — and cannot fail either, because
+/// there is nothing to be wrong. Refusing turns a repository that is sound into a gate that says
+/// FAIL; passing silently turns a gate into one that reports green over checks that never ran.
+///
+/// So the suites ask this, skip with the reason when it answers false, and the reason is printed.
+/// A green gate then says what it did not measure, which is the only honest shape a skip has.
+bool get installationIsFindable {
+  if (Platform.environment[installationVariable] case final String named) {
+    return Directory('$named/$installationPrograms').existsSync();
+  }
+  for (Directory above = Directory.current.absolute; ; above = above.parent) {
+    if (_installationsUnder(above).isNotEmpty) {
+      return true;
+    }
+    if (above.parent.path == above.path) {
+      return false;
+    }
+  }
+}
+
+/// Why the suites that need an installation tree are skipped where there is none.
+///
+/// Written out rather than composed from the refusal, because a skip line is read by somebody who
+/// has not seen the refusal and needs to know what to do about it.
+const String installationNotFound =
+    'no installation tree was found beside this repository, so the checks that read an '
+    'installation\'s programs did not run. Clone one beside this checkout, or set '
+    '$installationVariable to where it is.';
+
 /// The installation tree, as the environment names it or as a tree found from where the suite runs.
 String get installationRoot {
   if (Platform.environment[installationVariable] case final String named) {
