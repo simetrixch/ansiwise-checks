@@ -51,7 +51,7 @@ const int _searchDepth = 2;
 /// A green gate then says what it did not measure, which is the only honest shape a skip has.
 bool get installationIsFindable {
   if (Platform.environment[installationVariable] case final String named) {
-    return Directory('$named/$installationPrograms').existsSync();
+    return _holdsPrograms(named);
   }
   for (Directory above = Directory.current.absolute; ; above = above.parent) {
     if (_installationsUnder(above).isNotEmpty) {
@@ -75,7 +75,7 @@ const String installationNotFound =
 /// The installation tree, as the environment names it or as a tree found from where the suite runs.
 String get installationRoot {
   if (Platform.environment[installationVariable] case final String named) {
-    if (!Directory('$named/$installationPrograms').existsSync()) {
+    if (!_holdsPrograms(named)) {
       throw StateError(
         'no programs at $named/$installationPrograms — $installationVariable names a tree that '
         'does not hold an installation.',
@@ -140,7 +140,7 @@ String get installationProgramsRoot => '$installationRoot/$installationPrograms'
 List<String> _installationsUnder(Directory above) {
   final List<String> found = <String>[];
   void look(Directory directory, int depth) {
-    if (Directory('${directory.path}/$installationPrograms').existsSync()) {
+    if (_holdsPrograms(directory.path)) {
       found.add(directory.path);
       return;
     }
@@ -155,6 +155,21 @@ List<String> _installationsUnder(Directory above) {
   look(above, 0);
   found.sort();
   return found;
+}
+
+/// Whether [directory] holds the programs of an installation, and false where it cannot be asked.
+///
+/// Asking is not free of permission: on a system where a directory is not searchable, `existsSync`
+/// on a path INSIDE it throws rather than answering false. The walk climbs to the root of the
+/// volume and passes whatever a workspace happens to stand beside — a runner's `/home/<user>` among
+/// them — so the question has to survive being refused, exactly as listing already does below. An
+/// unreadable directory holds nothing this search can use, which is what false says.
+bool _holdsPrograms(String directory) {
+  try {
+    return Directory('$directory/$installationPrograms').existsSync();
+  } on FileSystemException {
+    return false;
+  }
 }
 
 /// The directories directly in [directory], and none where it cannot be listed.
