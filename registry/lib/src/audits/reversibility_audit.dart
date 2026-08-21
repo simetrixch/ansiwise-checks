@@ -11,17 +11,21 @@ import '../reversibility.dart';
 
 /// Runs the reversibility audit over [registry] and [tree].
 ///
-/// WHAT IT STATES: how many entries were read, and how many of them cannot be taken back. The second
-/// is the denominator of the half that has teeth — a reading in which nothing is irreversible holds
-/// the placeholder rule against nothing.
+/// WHAT IT STATES: how many entries were read, how many of them cannot be taken back, and how many of
+/// those are an exchange. The second is the denominator of the half that has teeth — a reading in
+/// which nothing is irreversible holds the placeholder rule against nothing. The third is the
+/// denominator of the rule that an exchange has something to publish, and it is separate because that
+/// rule reaches no other kind.
 void auditReversibility(Registry registry, {SourceTree? tree}) {
   final SourceTree judged = tree ?? SourceTree.on(repositoryRoot());
   final RegistryReading reading = RegistryReading.of(registry);
   final Reversibility check = Reversibility(tree: judged, reading: reading);
   final int entries = reading.entries.length;
   final int irreversible = check.irreversibleEntries.length;
+  final int exchanges = check.exchangeEntries.length;
 
-  test('$entries entry/entries were read, $irreversible of which cannot be taken back', () {
+  test('$entries entry/entries were read, $irreversible of which cannot be taken back, '
+      '$exchanges of those an exchange', () {
     expect(
       reading.entries,
       isNotEmpty,
@@ -29,7 +33,7 @@ void auditReversibility(Registry registry, {SourceTree? tree}) {
     );
   });
 
-  test('every registered step is reversible, irreversible or observing', () {
+  test('every registered step is reversible, irreversible, observing or an exchange', () {
     expect(
       check.findings,
       isEmpty,
@@ -123,8 +127,67 @@ void auditReversibility(Registry registry, {SourceTree? tree}) {
         reason: 'this check reports every irreversible step, so its silence means nothing',
       );
     });
+
+    // The exchange, from both sides. Its kind is told apart from an ordinary irreversible step, and
+    // it owes one thing more than a reason: something to publish. A postcondition over an empty set
+    // holds vacuously, so an exchange with nothing to publish has no postcondition at all — the
+    // request goes out and the row is a success with nothing to show for it.
+
+    test('an exchange is read as its own kind and still owes a reason', () {
+      final RegistryReading read = RegistryReading.of(
+        _registryOf(const _MintsAValue(), publishes: _mintedValue),
+      );
+
+      expect(read.entries.single.kind, StepKind.exchange);
+      expect(
+        Reversibility(tree: planted, reading: read).irreversibleEntries,
+        hasLength(1),
+        reason:
+            'the other end was told and only it knows its own inverse, so an exchange is one of the '
+            'entries that cannot be taken back',
+      );
+    });
+
+    test('an exchange whose reason says nothing is reported, exactly as any other is', () {
+      final Reversibility onPlanted = Reversibility(
+        tree: planted,
+        reading: RegistryReading.of(
+          _registryOf(const _MintsWithoutSayingWhatIsLost(), publishes: _mintedValue),
+        ),
+      );
+
+      expect(about(onPlanted.findings, 'planted'), isNotEmpty);
+    });
+
+    test('an exchange with nothing to publish is reported', () {
+      final Reversibility onPlanted = Reversibility(
+        tree: planted,
+        reading: RegistryReading.of(_registryOf(const _MintsAValue())),
+      );
+
+      expect(
+        about(onPlanted.findings, 'planted').map((Finding found) => found.what),
+        contains(contains('publishes nothing, so the postcondition')),
+      );
+    });
+
+    test('THE INNOCENT NEIGHBOUR: an exchange that publishes is left alone', () {
+      // Without this, a rule that reported every exchange would satisfy the probe above and turn
+      // every honest one red.
+      final Reversibility onPlanted = Reversibility(
+        tree: planted,
+        reading: RegistryReading.of(_registryOf(const _MintsAValue(), publishes: _mintedValue)),
+      );
+
+      expect(about(onPlanted.findings, 'planted'), isEmpty);
+    });
   });
 }
+
+/// What a planted exchange says it publishes, which is what gives it a postcondition at all.
+const List<MeasurementSpec> _mintedValue = <MeasurementSpec>[
+  MeasurementSpec(name: MeasurementName('minted_value'), describes: 'what the other end minted'),
+];
 
 /// Three reasons that really say what an operator loses, written without naming any one tool.
 ///
@@ -152,16 +215,18 @@ final String _plantedKinds = <String>[
 ].join('\n');
 
 /// A registry holding [step] under the name `planted` and nothing else.
-Registry _registryOf(Step step) => Registry(
-  steps: <StepName, RegisteredStep>{
-    const StepName('planted'): RegisteredStep(
-      name: const StepName('planted'),
-      source: 'lib/src/steps/planted.dart:1',
-      create: (Arguments arguments) => step,
-    ),
-  },
-  predicates: const <PredicateName, RegisteredPredicate>{},
-);
+Registry _registryOf(Step step, {List<MeasurementSpec> publishes = const <MeasurementSpec>[]}) =>
+    Registry(
+      steps: <StepName, RegisteredStep>{
+        const StepName('planted'): RegisteredStep(
+          name: const StepName('planted'),
+          source: 'lib/src/steps/planted.dart:1',
+          create: (Arguments arguments) => step,
+          publishes: publishes,
+        ),
+      },
+      predicates: const <PredicateName, RegisteredPredicate>{},
+    );
 
 /// A step that cannot be taken back and says so with a word instead of a reason.
 final class _SaysNothingIsLost extends IrreversibleStep {
@@ -175,6 +240,41 @@ final class _SaysNothingIsLost extends IrreversibleStep {
 
   @override
   Future<StepPlan> plan(StepContext context) async => const StepPlan.nothing('nothing to do');
+
+  @override
+  Future<void> apply(StepContext context) async {}
+}
+
+/// A step whose one request mints a value, and whose answer is the whole of what it did.
+final class _MintsAValue extends ExchangeStep {
+  const _MintsAValue();
+
+  @override
+  String get irreversibleReason =>
+      'the other end minted a value and there is no request that unmints it';
+
+  @override
+  Future<CheckResult> check(StepContext context) async => const CheckResult.ready();
+
+  @override
+  Future<StepPlan> plan(StepContext context) async => const StepPlan.nothing('would ask for one');
+
+  @override
+  Future<void> apply(StepContext context) async {}
+}
+
+/// An exchange that answers the question of being taken back with a word instead of a reason.
+final class _MintsWithoutSayingWhatIsLost extends ExchangeStep {
+  const _MintsWithoutSayingWhatIsLost();
+
+  @override
+  String get irreversibleReason => 'not implemented';
+
+  @override
+  Future<CheckResult> check(StepContext context) async => const CheckResult.ready();
+
+  @override
+  Future<StepPlan> plan(StepContext context) async => const StepPlan.nothing('would ask for one');
 
   @override
   Future<void> apply(StepContext context) async {}

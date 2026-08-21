@@ -2,9 +2,10 @@
 ///
 /// THE FIRST HALF IS ALREADY THE COMPILER'S, and it is checked anyway. `Step` has a private
 /// constructor, so it can be extended only through `ReversibleStep`, `IrreversibleStep` or
-/// `ObservingStep`, and the compiler refuses anything else. The day that constructor stops being
-/// private the compiler stops asking, and a step that answers neither would arrive silently — with a
-/// dry run that no longer knows whether it has passed the point of no return. This is what notices.
+/// `ObservingStep` — `ExchangeStep` extends the irreversible one — and the compiler refuses anything
+/// else. The day that constructor stops being private the compiler stops asking, and a step that
+/// answers neither would arrive silently, with a dry run that no longer knows whether it has passed
+/// the point of no return. This is what notices.
 ///
 /// THE SECOND HALF IS NOT ANYBODY'S. `irreversibleReason` is a string, and any string compiles. It is
 /// what the dry run shows an operator when it names the point beyond which there is no going back, so
@@ -55,6 +56,11 @@ const Set<String> placeholderReasons = <String>{
 };
 
 /// The three classes a step may extend, and the only ones allowed to extend `Step` itself.
+///
+/// `ExchangeStep` is deliberately NOT among them, and that is what its own declaration says: it
+/// extends `IrreversibleStep`, so the private constructor is already satisfied one level up and the
+/// scan below never sees it. What tells it apart from an ordinary irreversible step is its KIND,
+/// read off the built object.
 const Set<String> theThreeKinds = <String>{'ReversibleStep', 'IrreversibleStep', 'ObservingStep'};
 
 /// The check itself, over a tree and a registry it is given.
@@ -68,10 +74,21 @@ final class Reversibility {
   /// The registry as a running program sees it.
   final RegistryReading reading;
 
-  /// Every irreversible entry, for the count a person reads beside the verdict.
+  /// Every entry that cannot be taken back, for the count a person reads beside the verdict.
+  ///
+  /// An exchange is one of them. Its kind is told apart because idempotence decides differently
+  /// about it, and not because the question of taking it back is answered differently: the other end
+  /// was told, and only the interface that was spoken to knows its own inverse. So it owes a reason
+  /// exactly as every other irreversible entry does.
   List<RegistryEntry> get irreversibleEntries => <RegistryEntry>[
     for (final RegistryEntry entry in reading.entries)
-      if (entry.kind == StepKind.irreversible) entry,
+      if (entry.kind == StepKind.irreversible || entry.kind == StepKind.exchange) entry,
+  ];
+
+  /// Every entry whose answer is its whole effect.
+  List<RegistryEntry> get exchangeEntries => <RegistryEntry>[
+    for (final RegistryEntry entry in reading.entries)
+      if (entry.kind == StepKind.exchange) entry,
   ];
 
   /// Every class in this tree extending `Step` itself.
@@ -82,6 +99,7 @@ final class Reversibility {
     ...reading.problems,
     ..._kindFindings,
     ..._reasonFindings,
+    ..._exchangeFindings,
     for (final DeclaredStepClass declared in directExtensions)
       Finding(
         declared.path,
@@ -98,6 +116,24 @@ final class Reversibility {
           entry.name,
           '${entry.className} extends Step itself rather than ReversibleStep, IrreversibleStep or '
           'ObservingStep, so nothing says whether it can be taken back',
+        ),
+  ];
+
+  /// What an exchange owes beyond a reason: something to publish.
+  ///
+  /// The engine's postcondition for an exchange is that every name the row publishes now holds a
+  /// value, and a postcondition over an EMPTY set holds vacuously. An exchange registered with
+  /// nothing to publish therefore has no postcondition at all: the request goes out, the row is
+  /// recorded as a success, and nothing anywhere says what it did. It is refused here, where the
+  /// entry is written, rather than left to the run that meets it.
+  List<Finding> get _exchangeFindings => <Finding>[
+    for (final RegistryEntry entry in exchangeEntries)
+      if (entry.publishes.isEmpty)
+        Finding(
+          entry.name,
+          '${entry.className} is an exchange and its entry publishes nothing, so the postcondition '
+          'the engine reads for it holds over an empty set — the row would send its request and be '
+          'recorded as a success with nothing to show for it',
         ),
   ];
 

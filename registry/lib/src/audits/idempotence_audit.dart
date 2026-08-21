@@ -41,9 +41,18 @@ Future<void> auditIdempotence(
   // asserted against a hand-written list would have to be kept in step by somebody; asserted against
   // the kinds the registry really builds, it goes red the day the observing branch stops recognising
   // an observing step, and needs nothing from the package.
+  final List<RegistryEntry> asRegistered = RegistryReading.of(registry).entries;
   final List<String> observingByKind = <String>[
-    for (final RegistryEntry entry in RegistryReading.of(registry).entries)
+    for (final RegistryEntry entry in asRegistered)
       if (entry.kind == StepKind.observing) entry.name,
+  ]..sort();
+  // The same derivation for the exchanges, and for the same reason it is a derivation: a step whose
+  // answer is its whole effect repeats its work on every run by its KIND, so a hand-written ledger
+  // of them would be a list somebody has to keep in step. Asserted against the kinds the registry
+  // really builds, this bucket goes red the day the exchange branch stops recognising one.
+  final List<String> exchangeByKind = <String>[
+    for (final RegistryEntry entry in asRegistered)
+      if (entry.kind == StepKind.exchange) entry.name,
   ]..sort();
 
   test('${reading.coverage.length} of ${registry.steps.length} step(s) were run twice', () {
@@ -76,7 +85,8 @@ Future<void> auditIdempotence(
   });
 
   test('${reading.exercisedNames.length} step(s) were applied against a fake machine and were '
-      'satisfied afterwards, and ${reading.observingNames.length} only measure', () {
+      'satisfied afterwards, ${reading.observingNames.length} only measure, and '
+      '${reading.exchangeNames.length} send an exchange again on every run', () {
     expect(
       reading.observingNames,
       orderedEquals(observingByKind),
@@ -85,8 +95,17 @@ Future<void> auditIdempotence(
           'so that bucket is measuring something other than what it says',
     );
     expect(
+      reading.exchangeNames,
+      orderedEquals(exchangeByKind),
+      reason:
+          'the exchange bucket no longer holds exactly the steps the registry builds as exchanges, '
+          'so a step whose answer is its whole effect was run twice against a fake and the number '
+          'reported is about the fake',
+    );
+    expect(
       reading.exercisedNames.length +
           reading.observingNames.length +
+          reading.exchangeNames.length +
           reading.notCoveredNames.length,
       registry.steps.length,
       reason:
@@ -170,6 +189,26 @@ Future<void> auditIdempotence(
         ),
         isA<Exercised>(),
         reason: 'FakeShell.changes is what lets a postcondition actually become true',
+      );
+    });
+
+    test('a step whose answer is its whole effect is never run twice', () async {
+      // The bucket the audit above is asserted against, and what the step wrote down is what makes
+      // it mean something: an exchange asked here would send its request, and the answer would be
+      // reported as though it said something about idempotence.
+      final List<String> sent = <String>[];
+
+      expect(
+        await _runTwice(MintsWhatItCannotProve(sent)),
+        isA<SendsTheExchangeAgain>(),
+        reason:
+            'an exchange run twice against a fake reports a number about the fake, and the kind '
+            'already says a second run repeats the work',
+      );
+      expect(
+        sent,
+        isEmpty,
+        reason: 'nothing about an exchange is decided by sending its request here',
       );
     });
 
@@ -323,6 +362,31 @@ final class WorksThroughARequest extends IrreversibleStep {
   Future<void> apply(StepContext context) async {
     await context.http.send(const HttpRequest('POST', url, body: '{}'));
   }
+}
+
+/// A step whose one request mints a value, so nothing on the other end could prove it afterwards.
+///
+/// It writes down every time it is asked to do anything, which is how the probe above measures that
+/// the audit decided by KIND rather than by running it.
+final class MintsWhatItCannotProve extends ExchangeStep {
+  /// Creates the planted step, recording what it was asked to send into [sent].
+  const MintsWhatItCannotProve(this.sent);
+
+  /// Where it writes down each request it was asked for.
+  final List<String> sent;
+
+  @override
+  String get irreversibleReason =>
+      'the other end minted a value and there is no request that unmints it';
+
+  @override
+  Future<CheckResult> check(StepContext context) async => const CheckResult.ready();
+
+  @override
+  Future<StepPlan> plan(StepContext context) async => const StepPlan.nothing('would ask for one');
+
+  @override
+  Future<void> apply(StepContext context) async => sent.add('minted');
 }
 
 /// A step that changes nothing on any run and answers the same thing twice.

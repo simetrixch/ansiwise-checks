@@ -14,8 +14,14 @@
 ///
 /// A STEP COUNTED AS PASSING BECAUSE THE FAKE COULD NOT EXERCISE IT IS THE FAILURE THIS CHECK EXISTS
 /// TO PREVENT. So there is no bucket that means "probably fine". Every step lands in exactly one of
-/// [Exercised], [OnlyMeasures], [NotCovered] and [WouldRepeat], and a [NotCovered] step is named in
-/// a ledger the test asserts against — only a fixture arranged for that particular step closes one.
+/// [Exercised], [OnlyMeasures], [SendsTheExchangeAgain], [NotCovered] and [WouldRepeat], and a
+/// [NotCovered] step is named in a ledger the test asserts against — only a fixture arranged for
+/// that particular step closes one.
+///
+/// ONE OF THE FIVE IS DECIDED BY KIND AND NOT BY RUNNING ANYTHING. An `ExchangeStep` says of itself
+/// that its answer is its whole effect, so a second run repeats the work whatever machine it meets.
+/// Running it twice here would be measuring the fake and reporting the number as though it were
+/// about the step.
 library;
 
 import 'package:ansiwise_core/ansiwise_core.dart';
@@ -49,6 +55,22 @@ final class OnlyMeasures extends Coverage {
 
   @override
   String toString() => 'observing: $why';
+}
+
+/// A step whose second run does the exchange again, because its KIND says it must.
+///
+/// Not a failure and not a pass, and told apart from [NotCovered] because the two say different
+/// things. A step that is not covered is one nothing has shown anything about, and it leaves that
+/// bucket the day somebody arranges a fake for it. An exchange never leaves this one: its answer IS
+/// its effect, so there is nothing on the other end for a second check to find already done, and a
+/// second run sends the request again on any machine, fake or real. Its ledger is therefore not a
+/// list somebody keeps in step — it is the kinds the registry builds.
+final class SendsTheExchangeAgain extends Coverage {
+  /// Records that the kind itself says a second run repeats the work.
+  const SendsTheExchangeAgain(super.why);
+
+  @override
+  String toString() => 'exchange: $why';
 }
 
 /// The fake machine could not exercise it, and this says why not.
@@ -134,6 +156,9 @@ final class IdempotenceReading {
   /// The steps that only measure, sorted.
   List<String> get observingNames => _namesOf<OnlyMeasures>();
 
+  /// The steps whose second run sends the exchange again, sorted.
+  List<String> get exchangeNames => _namesOf<SendsTheExchangeAgain>();
+
   /// Every step whose second run would do the work again.
   List<Finding> get findings => <Finding>[
     ...problems,
@@ -151,7 +176,7 @@ final class IdempotenceReading {
   }
 }
 
-/// Runs [step] twice against one fake machine and decides which of the four it is.
+/// Runs [step] twice against one fake machine and decides which of the five it is.
 ///
 /// [fixture] arranges the fake the way the real machine would be arranged. Without it most steps
 /// cannot be measured at all: a fake shell records a command and does not carry it out, so a
@@ -181,6 +206,17 @@ Future<Coverage> runTwice(
     entropy: FakeEntropy(),
     log: CollectedLog(),
   );
+
+  // AN EXCHANGE IS NOT RUN AT ALL, and that is the honest answer rather than a shortcut. Its answer
+  // is its whole effect, so there is nothing on the other end for a second check to find already
+  // done: a second run sends the request again, on a fake machine and on a real one alike.
+  // Running it twice here would measure the fake and report it as though it were about the step.
+  if (step is ExchangeStep) {
+    return const SendsTheExchangeAgain(
+      'its answer is its whole effect, so a second run sends the request again — idempotence does '
+      'not hold for this kind, and no arrangement of any machine makes it hold',
+    );
+  }
 
   // A step that only measures changes nothing on any run, so the question is whether it ANSWERS the
   // same twice. One that does not is reading something about the machine that moved while nothing was

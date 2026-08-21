@@ -16,7 +16,7 @@ import 'package:ansiwise_core/ansiwise_core.dart';
 import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';
 import 'step_under_probe.dart';
 
-/// Which of the three kinds a step declared itself to be.
+/// Which kind a step declared itself to be.
 enum StepKind {
   /// It changed something and can put it back.
   reversible,
@@ -27,11 +27,21 @@ enum StepKind {
   /// It only measures.
   observing,
 
+  /// Its ANSWER is its whole effect, so nothing on the other end could prove it afterwards.
+  ///
+  /// An exchange is irreversible and told apart from one here because two audits decide differently
+  /// about it. Reversibility asks it for a reason like any other irreversible step, and asks one
+  /// thing more: what it publishes, because a postcondition over an empty set holds vacuously and a
+  /// kind with nothing to publish therefore has no postcondition at all. Idempotence does not run it
+  /// twice: a second run sends the exchange again, by the kind's own statement, and no arrangement of
+  /// any machine changes that.
+  exchange,
+
   /// It extends [Step] itself, so nothing says whether it can be taken back.
   ///
   /// Not reachable while [Step]'s constructor is private, and written out because that is exactly
   /// what a check is for: the day the constructor stops being private, an entry answers this and the
-  /// check reading it goes red, instead of the choice quietly gaining a fourth meaning.
+  /// check reading it goes red, instead of the choice quietly gaining a meaning nobody wrote down.
   unknown,
 }
 
@@ -44,6 +54,7 @@ final class RegistryEntry {
     required this.className,
     required this.kind,
     required this.irreversibleReason,
+    this.publishes = const <String>[],
   });
 
   /// The name a program file writes.
@@ -55,12 +66,18 @@ final class RegistryEntry {
   /// The class the entry's factory actually built.
   final String className;
 
-  /// Which of the three kinds the built step is.
+  /// Which kind the built step is.
   final StepKind kind;
 
   /// What about the change cannot be taken back, or the empty string when the question does not
   /// arise.
   final String irreversibleReason;
+
+  /// The names this entry says its step publishes, in the order the entry writes them.
+  ///
+  /// Read off the ENTRY rather than off the built step, because that is where the framework reads
+  /// them too: the sink refuses a name the entry does not declare, whatever the class would publish.
+  final List<String> publishes;
 }
 
 /// One predicate entry, as the registry holds it.
@@ -139,6 +156,7 @@ final class RegistryReading {
           className: step.runtimeType.toString(),
           kind: _kindOf(step),
           irreversibleReason: _reasonOf(step, problems.add),
+          publishes: <String>[for (final MeasurementSpec spec in entry.publishes) spec.name.value],
         ),
       );
     }
@@ -186,7 +204,13 @@ final class RegistryReading {
   };
 }
 
+/// Which kind [step] is, with the exchange asked FIRST because it extends the irreversible one.
+///
+/// A switch answers on the first pattern that matches, and every exchange is an [IrreversibleStep].
+/// Asked the other way round, an exchange would read as an ordinary irreversible step — and both
+/// audits below would treat it as one, which is the whole thing this enum exists to prevent.
 StepKind _kindOf(Step step) => switch (step) {
+  ExchangeStep() => StepKind.exchange,
   ReversibleStep() => StepKind.reversible,
   IrreversibleStep() => StepKind.irreversible,
   ObservingStep() => StepKind.observing,
