@@ -196,7 +196,11 @@ StepContext probeContext({
   step: step,
   arguments: arguments,
   answers: answers,
-  measurements: (measurements ?? Measurements()).forStep(step, publishes),
+  // A collection of its own where the caller brought none, and it is handed a redactor that hides
+  // NOTHING YET rather than the one that hides nothing ever: a spec declaring itself secret
+  // registers its value at publish, and `Redactor.none` refuses to be registered with. A probe of a
+  // step that publishes a secret would otherwise fail on the sentinel rather than on the step.
+  measurements: (measurements ?? Measurements(Redactor(const <String>[]))).forStep(step, publishes),
   facts: Facts.none,
 );
 
