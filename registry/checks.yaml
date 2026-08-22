@@ -29,3 +29,9 @@ tool-purity: test/checks/tool_purity_test.dart
 # manifest, and the tree standing at it is the whole of what a caller then gets — so the release
 # lives here, beside the manifest that names the other package, and this is what holds it.
 release: test/checks/release_test.dart
+# Every dependency this package resolves out of git names a release tag and never a branch. Two are
+# judged: ansiwise_core, which whoever resolves this package resolves too, and the tree half of this
+# same repository, reached out of git so the two halves are released together and read each other
+# at the version they were released at. The sister package runs the same audit over its own
+# manifest, so between them every manifest of this repository is judged.
+dependency-pins: test/checks/dependency_pins_test.dart
