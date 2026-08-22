@@ -1,6 +1,7 @@
 /// The suite that drives [Idempotence] over one registry, with its counter-probe.
 library;
 
+import 'package:ansiwise_checks_tree/ansiwise_checks_tree.dart';
 import 'package:ansiwise_core/ansiwise_core.dart';
 import 'package:ansiwise_core/testing.dart';
 import 'package:test/test.dart';
@@ -30,6 +31,17 @@ Future<void> auditIdempotence(
   required Set<String> notCoveredByAFakeMachine,
   Arguments? answers,
 }) async {
+  // SKIPPED WHERE THERE IS NO INSTALLATION TO READ, printed rather than passed over. What this
+  // audit measures is a registry against the ANSWERS a real installation declares, and that tree is
+  // a sibling checkout: it stands beside a developer's clone and beside nothing on a release
+  // runner. Reaching for it there threw while the suite was still LOADING, which took the whole
+  // gate down over one check that could not be measured — a release refused for a reason that says
+  // nothing about the release.
+  if (!installationIsFindable) {
+    test('idempotence', () {}, skip: installationNotFound);
+    return;
+  }
+
   final Idempotence check = Idempotence(
     registry: registry,
     answers: answers ?? (await answersDeclaredBy(registry)).values,

@@ -29,6 +29,17 @@ import '../step_under_probe.dart';
 /// WHAT IT STATES: how many answers this package's steps read, how many the programs declare, and
 /// how many of the ones it reads carry a default.
 Future<void> auditDeclaredAnswers(Registry registry, {Files files = const RealFiles()}) async {
+  // SKIPPED WHERE THERE IS NO INSTALLATION TO READ, printed rather than passed over. What this
+  // audit measures is a registry against the ANSWERS a real installation declares, and that tree is
+  // a sibling checkout: it stands beside a developer's clone and beside nothing on a release
+  // runner. Reaching for it there threw while the suite was still LOADING, which took the whole
+  // gate down over one check that could not be measured — a release refused for a reason that says
+  // nothing about the release.
+  if (!installationIsFindable) {
+    test('declared-answers', () {}, skip: installationNotFound);
+    return;
+  }
+
   final Set<String> read = <String>{
     for (final RegisteredStep entry in registry.steps.values) ...entry.answers,
   };
