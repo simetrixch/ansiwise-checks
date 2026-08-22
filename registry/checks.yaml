@@ -25,3 +25,7 @@ declared-checks: test/checks/declared_checks_test.dart
 # package's checks are made of, so a product name here travels to every package that runs them
 # without any of them writing it down, and nothing outside this repository reads these files.
 tool-purity: test/checks/tool_purity_test.dart
+# One tag releases every package of this repository, that tag is what a caller names in its own
+# manifest, and the tree standing at it is the whole of what a caller then gets — so the release
+# lives here, beside the manifest that names the other package, and this is what holds it.
+release: test/checks/release_test.dart
