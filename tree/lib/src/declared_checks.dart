@@ -101,10 +101,15 @@ List<String> checkFilesUnder(Directory package, String directory) {
   if (!checks.existsSync()) {
     return const <String>[];
   }
+  // RECURSIVE, because `dart test` is. A suite one directory further down runs exactly like a suite
+  // beside its neighbours, and a listing that stopped at the top level could not see it — so a check
+  // added that nobody declared, or a declared one moved out of sight, both read as a clean answer.
+  // The path is kept whole rather than reduced to a file name for the same reason: two suites of the
+  // same name in two directories are two suites, and one declaration cannot stand for both.
   final List<String> found = <String>[
-    for (final FileSystemEntity entry in checks.listSync(followLinks: false))
+    for (final FileSystemEntity entry in checks.listSync(recursive: true, followLinks: false))
       if (entry is File && entry.path.endsWith('_test.dart'))
-        '$directory/${entry.path.split(RegExp(r'[/\\]')).last}',
+        '$directory/${entry.path.substring(checks.path.length + 1).replaceAll(r'\', '/')}',
   ];
   found.sort();
   return found;
