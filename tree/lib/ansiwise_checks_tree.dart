@@ -20,6 +20,7 @@ export 'src/dependency_pins.dart';
 export 'src/directive_case.dart';
 export 'src/exec_confinement.dart';
 export 'src/finding.dart';
+export 'src/hosted_only.dart';
 export 'src/installation_programs.dart';
 export 'src/line_endings.dart';
 export 'src/naming.dart';

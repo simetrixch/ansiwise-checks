@@ -29,3 +29,7 @@ dependency-pins: test/checks/dependency_pins_test.dart
 # itself lives in, so a product name here is inherited by every package that depends on it without
 # any of them writing it down, and nothing outside this repository reads these files.
 tool-purity: test/checks/tool_purity_test.dart
+# Every dependency this package names is served by pub.dev. The framework takes it as a dev
+# dependency and gives up nothing for it, on the promise that it reaches nothing of ours — and
+# from over there it is a git dependency nothing can follow, so the promise is kept here.
+hosted-only: test/checks/hosted_only_test.dart
