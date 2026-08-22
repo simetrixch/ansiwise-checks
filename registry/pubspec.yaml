@@ -28,7 +28,7 @@ dependencies:
   ansiwise_checks_tree:
     git:
       url: https://github.com/simetrixch/ansiwise-checks.git
-      ref: master
+      ref: 0.1.0-alpha-20260822220752
       path: tree
   path: ^1.9.1
   test: ^1.31.2
