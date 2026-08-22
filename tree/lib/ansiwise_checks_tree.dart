@@ -16,6 +16,7 @@ export 'src/analysis.dart';
 export 'src/carried_arguments.dart';
 export 'src/declared_arguments.dart';
 export 'src/declared_checks.dart';
+export 'src/dependency_pins.dart';
 export 'src/directive_case.dart';
 export 'src/exec_confinement.dart';
 export 'src/finding.dart';
