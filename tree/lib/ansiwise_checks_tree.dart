@@ -13,6 +13,7 @@
 library;
 
 export 'src/analysis.dart';
+export 'src/argument_specs.dart';
 export 'src/carried_arguments.dart';
 export 'src/declared_arguments.dart';
 export 'src/declared_checks.dart';

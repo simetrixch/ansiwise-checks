@@ -21,10 +21,13 @@ import '../step_under_probe.dart';
 /// [answers] is what a program file would give the steps. Left out, it is read from what the
 /// installation's programs declare for the answers THIS registry's steps say they read.
 ///
-/// WHAT IT STATES: the whole census. How many steps were run twice, and how many of them were
-/// applied and then satisfied, only measure, or could not be exercised at all. There is no bucket
-/// that means "probably fine": a step counted as passing because the fake could not exercise it is
-/// the failure this audit exists to prevent.
+/// WHAT IT STATES: the whole census. How many steps were run twice, under how many argument
+/// settings, how many of those steps were driven under both values of a flag they declare with no
+/// value of its own, and how many were applied and then satisfied, only measure, or could not be
+/// exercised at all. There is no bucket that means "probably fine": a step counted as passing
+/// because the fake could not exercise it is the failure this audit exists to prevent, and a step
+/// counted as passing because only one half of a flag it declares was ever driven is the same
+/// failure one level down.
 Future<void> auditIdempotence(
   Registry registry, {
   required Map<String, Fixture> fixtures,
@@ -67,7 +70,9 @@ Future<void> auditIdempotence(
       if (entry.kind == StepKind.exchange) entry.name,
   ]..sort();
 
-  test('${reading.coverage.length} of ${registry.steps.length} step(s) were run twice', () {
+  test('${reading.coverage.length} of ${registry.steps.length} step(s) were run twice, over '
+      '${reading.drives} argument setting(s), ${reading.drivenBothWays.length} step(s) of them '
+      'under both values of a flag they declare with no value of its own', () {
     expect(
       reading.coverage,
       hasLength(registry.steps.length),
@@ -137,7 +142,8 @@ Future<void> auditIdempotence(
       orderedEquals(notCoveredByAFakeMachine.toList()..sort()),
       reason:
           'a step a fake machine cannot exercise has not been shown to be idempotent by anything; '
-          'either arrange the fake for it, or name it in the ledger',
+          'either arrange the fake for it, or name it in the ledger — '
+          '${reading.notCoveredReasons.join('; ')}',
     );
   });
 
@@ -224,6 +230,58 @@ Future<void> auditIdempotence(
       );
     });
 
+    test('a flag with no value of its own is driven both ways, and one with a default is not', () {
+      // What the census above counts, and the thing that was invisible for as long as the probe
+      // handed every flag `false`: a flag whose declaration names no default has no value a program
+      // that says nothing runs with, so neither of its two branches is the one worth probing.
+      expect(
+        <String>[
+          for (final Arguments each in plausibleArgumentSettings(const <ArgumentSpec>[
+            elevationArgument,
+          ]))
+            describeSetting(each, const <ArgumentSpec>[elevationArgument]),
+        ],
+        <String>['elevated: false', 'elevated: true'],
+      );
+      expect(
+        plausibleArgumentSettings(const <ArgumentSpec>[
+          ArgumentSpec(
+            name: 'force',
+            kind: ArgumentKind.flag,
+            required: false,
+            defaultValue: false,
+            describes: 'what a row may ask for and a program that says nothing does not get',
+          ),
+        ]),
+        hasLength(1),
+      );
+    });
+
+    test('a step that repeats its work only under the elevated branch is caught', () async {
+      // THE SHAPE THIS WIDENING EXISTS FOR. Everything below the flag is ordinary: the step is
+      // built, applied and checked again. What decides whether anything is seen is which value the
+      // probe handed it, and one of the two was never handed to any step in any tree.
+      final IdempotenceReading reading = await _readingOf(
+        (Arguments arguments) => WritesElsewhereWhenElevated(elevated: arguments.flag('elevated')),
+      );
+
+      expect(reading.settings['planted'], 2);
+      expect(reading.coverage['planted'], isA<WouldRepeat>());
+      expect(reading.findings.single.what, contains('elevated: true'));
+    });
+
+    test('THE INNOCENT NEIGHBOUR: a step that behaves the same under both is exercised', () async {
+      // Without this an audit that reported every step declaring a flag would pass the probe above,
+      // and a clean answer would mean nobody was looking.
+      final IdempotenceReading reading = await _readingOf(
+        (Arguments arguments) => const WritesOnlyOnce(),
+      );
+
+      expect(reading.settings['planted'], 2);
+      expect(reading.coverage['planted'], isA<Exercised>());
+      expect(reading.findings, isEmpty);
+    });
+
     test('a step that only measures is recognised as one', () async {
       expect(
         await _runTwice(const OnlyMeasuresTheMachine()),
@@ -238,6 +296,25 @@ Future<void> auditIdempotence(
 
 Future<Coverage> _runTwice(Step step, {Fixture? fixture}) =>
     runTwice(const StepName('planted'), step, Arguments.none, fixture: fixture);
+
+/// The whole audit run over one planted step that declares the elevation, and nothing else.
+///
+/// A registry rather than a bare step, because what is being probed is the part that decides HOW
+/// MANY times a step is driven and what it is handed each time.
+Future<IdempotenceReading> _readingOf(Step Function(Arguments arguments) create) => Idempotence(
+  registry: Registry(
+    steps: <StepName, RegisteredStep>{
+      const StepName('planted'): RegisteredStep(
+        name: const StepName('planted'),
+        source: 'lib/planted.dart:1',
+        create: create,
+        arguments: const <ArgumentSpec>[elevationArgument],
+      ),
+    },
+    predicates: const <PredicateName, RegisteredPredicate>{},
+  ),
+  fixtures: const <String, Fixture>{},
+).runEveryStep();
 
 /// Where the planted steps write, so they cannot read each other's file.
 const String _plantedPath = '/etc/planted';
@@ -301,6 +378,43 @@ final class WritesOnlyOnce extends ReversibleStep<bool> {
       await context.files.delete(_plantedPath);
     }
   }
+}
+
+/// A step that writes where its own check never looks, but only where the row granted elevation.
+///
+/// The half of a step that one value of a flag reaches and the other does not. Under
+/// `elevated: false` it writes what it checks and is satisfied on its second run; under
+/// `elevated: true` it writes somewhere else, its check keeps answering ready, and every run of the
+/// program does the work again.
+final class WritesElsewhereWhenElevated extends IrreversibleStep {
+  /// Creates the planted step, reaching for root where [elevated].
+  const WritesElsewhereWhenElevated({required this.elevated});
+
+  /// Where it writes when the row granted elevation, which is not where it looks.
+  static const String rootPath = '/etc/planted-as-root';
+
+  /// Whether the row granted elevation.
+  final bool elevated;
+
+  @override
+  String get irreversibleReason => 'the file is replaced whole and nothing holds what was there';
+
+  @override
+  Future<CheckResult> check(StepContext context) async => await context.files.exists(_plantedPath)
+      ? const CheckResult.satisfied('the file is there')
+      : const CheckResult.ready();
+
+  @override
+  Future<StepPlan> plan(StepContext context) async =>
+      const StepPlan.diff(_plantedPath, before: '', after: 'once');
+
+  @override
+  Future<void> apply(StepContext context) async => context.files.write(
+    elevated ? rootPath : _plantedPath,
+    'once',
+    mode: 0x180,
+    elevated: elevated,
+  );
 }
 
 /// A step whose postcondition a real command would leave behind, and a fake one never does.

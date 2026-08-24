@@ -28,36 +28,88 @@ typedef Fixture = void Function(FakeShell shell, FakeFiles files, FakeHttp http)
 /// that arranges the wrong file and a step that comes back not covered for no visible reason.
 const String plausibleText = 'x';
 
-/// A value for every argument [specs] declares.
+/// The flags of [specs] whose declaration names no value of its own.
 ///
-/// A default wins wherever there is one, because that is the value a program that says nothing about
-/// the argument would run with — the case worth probing. Where the declaration names the values it
-/// may hold, the first of them is taken: a step that DECIDES on such a value refuses anything
-/// outside the set, correctly, and handing it the generic 'x' would measure the probe rather than
-/// the step. Everything else gets the simplest value of its kind. No step may read an argument it
-/// did not declare, so this is enough to build any of them that keeps to its own declaration; one
-/// that does not fails to build, and a check reports that rather than passing over the step.
-Arguments plausibleArguments(List<ArgumentSpec> specs) {
-  final Map<String, Object> values = <String, Object>{};
+/// **A flag has two values and a step does different work under each, so one of them is not a
+/// probe of that step — it is half of one.** Where the declaration names a default, the other half
+/// is still reachable by a row but the default is what a program that says nothing runs with, and
+/// that is the case worth probing. Where it names none, `false` is not a default and not a decision:
+/// it is the simplest value of the kind, and handing it over silently is how a step that declared
+/// the shared elevation, never read it, and ran unelevated on every machine passed every check.
+///
+/// Measured: the elevation argument declares no default, and the installation's own program sets
+/// `elevated: true` for every row of a whole deployment. So the value a probe invented was the one
+/// the product almost never runs with.
+List<ArgumentSpec> flagsWithNoValueOfTheirOwn(List<ArgumentSpec> specs) => <ArgumentSpec>[
+  for (final ArgumentSpec spec in specs)
+    if (spec.kind == ArgumentKind.flag && spec.defaultValue == null && spec.allowed.isEmpty) spec,
+];
+
+/// Every set of values a step is worth driving under: one per combination of the flags it declares
+/// with no value of their own, all of them false first.
+///
+/// The count is 2^n over those flags alone, which is one setting for a step that declares none and
+/// two for a step that declares the elevation. Every other argument holds the same value in every
+/// setting, for the reasons [plausibleArguments] gives.
+List<Arguments> plausibleArgumentSettings(List<ArgumentSpec> specs) {
+  final Map<String, Object> fixed = <String, Object>{};
+  final List<ArgumentSpec> driven = flagsWithNoValueOfTheirOwn(specs);
+  final Set<String> drivenNames = <String>{for (final ArgumentSpec spec in driven) spec.name};
   for (final ArgumentSpec spec in specs) {
-    values[spec.name] =
-        spec.defaultValue ??
-        (spec.allowed.isNotEmpty ? spec.allowed.first : null) ??
-        switch (spec.kind) {
-          ArgumentKind.text => plausibleText,
-          ArgumentKind.answerName => plausibleText,
-          ArgumentKind.integer => 1,
-          ArgumentKind.flag => false,
-          ArgumentKind.textList => const <String>['x'],
-          // A mapping is planted with one entry naming one answer, because that is the smallest
-          // shape every step declaring one accepts. A step wanting more says so in its own refusal.
-          ArgumentKind.mapping => const <String, Object?>{
-            'X': <String, Object?>{'answer': plausibleText},
-          },
-        };
+    if (!drivenNames.contains(spec.name)) {
+      fixed[spec.name] = _plausibleValueOf(spec);
+    }
   }
-  return Arguments(values);
+  List<Map<String, Object>> settings = <Map<String, Object>>[<String, Object>{}];
+  for (final ArgumentSpec spec in driven) {
+    settings = <Map<String, Object>>[
+      for (final Map<String, Object> each in settings)
+        for (final bool value in <bool>[false, true]) <String, Object>{...each, spec.name: value},
+    ];
+  }
+  return <Arguments>[
+    for (final Map<String, Object> setting in settings)
+      Arguments(<String, Object>{...fixed, ...setting}),
+  ];
 }
+
+/// A value for every argument [specs] declares, driving each flag at its default.
+///
+/// What a caller that runs a step ONCE hands it — the first of [plausibleArgumentSettings], where
+/// every flag with no value of its own stands false. A default wins wherever there is one, because
+/// that is the value a program that says nothing about the argument would run with. Where the
+/// declaration names the values it may hold, the first of them is taken: a step that DECIDES on such
+/// a value refuses anything outside the set, correctly, and handing it the generic 'x' would measure
+/// the probe rather than the step. Everything else gets the simplest value of its kind. No step may
+/// read an argument it did not declare, so this is enough to build any of them that keeps to its own
+/// declaration; one that does not fails to build, and a check reports that rather than passing over
+/// the step.
+Arguments plausibleArguments(List<ArgumentSpec> specs) => plausibleArgumentSettings(specs).first;
+
+/// Which of [specs]' driven flags [values] holds, in the words a finding names them by.
+///
+/// Empty where the step declares none, so a finding about such a step reads exactly as it did before
+/// there was more than one setting.
+String describeSetting(Arguments values, List<ArgumentSpec> specs) => <String>[
+  for (final ArgumentSpec spec in flagsWithNoValueOfTheirOwn(specs))
+    '${spec.name}: ${values.flag(spec.name)}',
+].join(', ');
+
+Object _plausibleValueOf(ArgumentSpec spec) =>
+    spec.defaultValue ??
+    (spec.allowed.isNotEmpty ? spec.allowed.first : null) ??
+    switch (spec.kind) {
+      ArgumentKind.text => plausibleText,
+      ArgumentKind.answerName => plausibleText,
+      ArgumentKind.integer => 1,
+      ArgumentKind.flag => false,
+      ArgumentKind.textList => const <String>['x'],
+      // A mapping is planted with one entry naming one answer, because that is the smallest
+      // shape every step declaring one accepts. A step wanting more says so in its own refusal.
+      ArgumentKind.mapping => const <String, Object?>{
+        'X': <String, Object?>{'answer': plausibleText},
+      },
+    };
 
 /// [given] with an answer standing under every name the probe's own arguments point at.
 ///
@@ -82,21 +134,30 @@ Arguments answersForProbe(Arguments given, List<ArgumentSpec> specs) {
   return Arguments(planted);
 }
 
-/// The step [entry] builds from [plausibleArguments], or null when it cannot be built that way.
+/// The step [entry] builds from [arguments], or null when it cannot be built from them.
 ///
-/// [onFailure] is given a finding naming the step and the reason. Every throwable is caught,
-/// including an [Error]: a step that reads an argument it never declared throws [ArgumentError], and
-/// that is precisely the defect worth reporting rather than letting one entry end the walk and say
-/// nothing about the rest.
-Step? buildStep(RegisteredStep entry, void Function(Finding failure) onFailure) {
+/// [arguments] is one of [plausibleArgumentSettings] and the step is BUILT again for each of them,
+/// rather than built once and re-run: what a row grants reaches a step through its factory, so a
+/// factory that drops the value is invisible to anything that builds the step only one way.
+///
+/// [onFailure] is given a finding naming the step, the setting it was built under, and the reason.
+/// Every throwable is caught, including an [Error]: a step that reads an argument it never declared
+/// throws [ArgumentError], and that is precisely the defect worth reporting rather than letting one
+/// entry end the walk and say nothing about the rest.
+Step? buildStep(
+  RegisteredStep entry,
+  Arguments arguments,
+  void Function(Finding failure) onFailure,
+) {
   try {
-    return entry.create(plausibleArguments(entry.arguments));
+    return entry.create(arguments);
   } on Object catch (failure) {
+    final String setting = describeSetting(arguments, entry.arguments);
     onFailure(
       Finding(
         entry.name.value,
-        'could not be built from the arguments it declares itself, so nothing about it was '
-        'measured — $failure',
+        'could not be built from the arguments it declares itself'
+        '${setting.isEmpty ? '' : ', under $setting'}, so nothing about it was measured — $failure',
       ),
     );
     return null;

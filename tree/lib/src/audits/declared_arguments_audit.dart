@@ -12,9 +12,16 @@ import '../source_tree.dart';
 /// [scannedPaths] are the directories read, named one at a time by the caller rather than derived,
 /// so widening the scan is a decision somebody makes rather than a silent change.
 ///
-/// WHAT IT STATES: how many arguments were found declared and how many files were read. A scan that
-/// found no declaration at all would pass over any tree, and a scan that read no file looked nowhere
-/// — either would report a clean tree while measuring nothing.
+/// WHAT IT STATES: how many arguments were found declared, how many of those a file declared by
+/// LISTING somebody else's identifier, and how many files were read. A scan that found no
+/// declaration at all would pass over any tree, and a scan that read no file looked nowhere — either
+/// would report a clean tree while measuring nothing.
+///
+/// **The listed ones are counted apart because a step declares its elevation that way and only that
+/// way.** They carry no `name:` in the file that declares them, so for as long as this scan read
+/// only what was written out, every such declaration was invisible to it — and the count of them
+/// would have read as zero beside a large and reassuring total. The count may honestly be zero: a
+/// tree whose steps reach nothing a row could grant lists no shared spec at all.
 void auditDeclaredArguments({required List<String> scannedPaths, SourceTree? tree}) {
   final SourceTree judged = tree ?? SourceTree.on(repositoryRoot());
   final DeclaredArguments scan = DeclaredArguments(tree: judged, scanned: scannedPaths);
@@ -24,7 +31,8 @@ void auditDeclaredArguments({required List<String> scannedPaths, SourceTree? tre
     expect(scan.files, isNotEmpty, reason: 'none of $where is in this tree');
   });
 
-  test('${scan.declared.length} declared argument(s) were found to judge', () {
+  test('${scan.declared.length} declared argument(s) were found to judge, ${scan.listed.length} '
+      'of them declared by listing a shared spec', () {
     expect(
       scan.declared,
       isNotEmpty,
@@ -183,6 +191,136 @@ final class Subject {
         DeclaredArguments.findingsIn(planted, 'lib/a.dart', alsoRead: "arguments.flag('two')"),
         hasLength(1),
       );
+    });
+
+    // THE THIRD SHAPE: a declaration written as an identifier, which carries no name in the file
+    // that makes it.
+    test('a step that LISTS the shared elevation and never reads it is reported', () {
+      // The exact shape found on 2026-08-24. The list declares the argument, so the resolver
+      // delivered the program-wide `elevated: true` to this step on every run; the factory never
+      // read it, so the field stayed false and the command went out as the account the run started
+      // as. Nothing refused anything, and the step's own suite passed.
+      const String planted = '''
+final class Subject {
+  const Subject({required this.credentialsCommand, this.elevated = false});
+
+  factory Subject.fromArguments(Arguments arguments) =>
+      Subject(credentialsCommand: arguments.textList('credentials_command'));
+
+  static const List<ArgumentSpec> arguments = <ArgumentSpec>[
+    ArgumentSpec(name: 'credentials_command', kind: ArgumentKind.textList, describes: 'the words'),
+    elevationArgument,
+  ];
+
+  final bool elevated;
+}
+''';
+
+      final List<Finding> found = DeclaredArguments.findingsIn(planted, 'lib/subject.dart');
+
+      expect(found, hasLength(1));
+      expect(found.single.line, 9);
+      expect(found.single.what, contains('elevationArgument'));
+      expect(found.single.what, contains('"elevated"'));
+    });
+
+    test('THE INNOCENT NEIGHBOUR: the same step reading what it listed is not reported', () {
+      // The fixed state of the one above, and without it a scan reporting every listed identifier
+      // would pass the probe above while reporting every correct step in the tree.
+      const String planted = '''
+final class Subject {
+  factory Subject.fromArguments(Arguments arguments) => Subject(
+    credentialsCommand: arguments.textList('credentials_command'),
+    elevated: arguments.has('elevated') && arguments.flag('elevated'),
+  );
+
+  static const List<ArgumentSpec> arguments = <ArgumentSpec>[
+    ArgumentSpec(name: 'credentials_command', kind: ArgumentKind.textList, describes: 'the words'),
+    elevationArgument,
+  ];
+
+  final bool elevated;
+}
+''';
+
+      expect(DeclaredArguments.findingsIn(planted, 'lib/subject.dart'), isEmpty);
+    });
+
+    test('a qualified identifier is the class\'s own declaration and not this step\'s', () {
+      // `Client.elevationArgument` declares a different name and is read by `Client.fromArguments`,
+      // in the file that declares it. A step listing it owes no read of its own, and a substring
+      // comparison taking it for the shared one would report every such step.
+      const String planted = '''
+final class Subject {
+  factory Subject.fromArguments(Arguments arguments) =>
+      Subject(client: Client.fromArguments(arguments));
+
+  static const List<ArgumentSpec> arguments = <ArgumentSpec>[
+    Client.argument,
+    Client.elevationArgument,
+  ];
+}
+''';
+
+      expect(DeclaredArguments.findingsIn(planted, 'lib/subject.dart'), isEmpty);
+    });
+
+    test('the file that DECLARES a spec under that identifier has not listed it', () {
+      // A declaration writes the identifier bare and follows it with `=`. Counting that as a
+      // listing would make every file declaring a shared spec owe a read it is not meant to make.
+      const String planted = """
+const ArgumentSpec elevationArgument = ArgumentSpec(
+  name: 'elevated',
+  kind: ArgumentKind.flag,
+  required: false,
+  describes: 'whether what this row points at is reachable only as root',
+);
+""";
+
+      expect(
+        DeclaredArguments.findingsIn(
+          planted,
+          'lib/arguments.dart',
+          alsoRead: "elevated: arguments.flag('elevated'),",
+        ),
+        isEmpty,
+      );
+    });
+
+    test('a spec a package declares itself is listed and read the same way', () {
+      // The framework's own is not the only one: a package declaring a spec for several of its
+      // steps is resolved over the whole scan, so a step listing it owes the same read.
+      final SourceTree planted = SourceTree.planted(<String, String?>{
+        'lib/status_command.dart': """
+const ArgumentSpec statusCommandArgument = ArgumentSpec(
+  name: 'status_command',
+  kind: ArgumentKind.textList,
+  describes: 'how the addons are asked',
+);
+""",
+        'lib/asks.dart': '''
+final class Asks {
+  factory Asks.fromArguments(Arguments arguments) =>
+      Asks(command: arguments.textList('status_command'));
+  static const List<ArgumentSpec> arguments = <ArgumentSpec>[statusCommandArgument];
+}
+''',
+        'lib/ignores.dart': '''
+final class Ignores {
+  factory Ignores.fromArguments(Arguments arguments) => const Ignores();
+  static const List<ArgumentSpec> arguments = <ArgumentSpec>[statusCommandArgument];
+}
+''',
+      });
+
+      final List<Finding> found = DeclaredArguments(
+        tree: planted,
+        scanned: const <String>['lib'],
+      ).findings;
+
+      expect(found, hasLength(1));
+      expect(found.single.subject, 'lib/ignores.dart');
+      expect(found.single.what, contains('statusCommandArgument'));
     });
   });
 }

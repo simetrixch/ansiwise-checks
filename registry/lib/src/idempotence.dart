@@ -110,45 +110,129 @@ final class Idempotence {
   final Map<String, Fixture> fixtures;
 
   /// What each step did on its second run, by the name a program file writes.
+  ///
+  /// **Every step is driven once per SETTING it has**, which is one combination of the flags it
+  /// declares with no value of their own, and it is BUILT again for each — a value a row grants
+  /// reaches a step through its factory, so a factory that drops one is invisible to anything that
+  /// builds the step one way. What a step is reported as is the least covered thing any of its
+  /// settings showed: a step exercised under one and never exercised under another has not been
+  /// shown to be idempotent, and reporting the covered half would be the same failure as reporting
+  /// a step the fake could not exercise as a pass.
   Future<IdempotenceReading> runEveryStep() async {
     final Map<String, Coverage> coverage = <String, Coverage>{};
+    final Map<String, int> settings = <String, int>{};
     final List<Finding> problems = <Finding>[];
     for (final MapEntry<StepName, RegisteredStep> pair in registry.steps.entries) {
-      final Step? step = buildStep(pair.value, problems.add);
-      if (step == null) {
-        continue;
+      final List<Arguments> drives = plausibleArgumentSettings(pair.value.arguments);
+      settings[pair.key.value] = drives.length;
+      for (final Arguments arguments in drives) {
+        final Step? step = buildStep(pair.value, arguments, problems.add);
+        if (step == null) {
+          continue;
+        }
+        final Coverage seen = await runTwice(
+          pair.key,
+          step,
+          arguments,
+          answers: answersForProbe(answers, pair.value.arguments),
+          // A step that measures does it inside the check this runs twice, and the sink refuses a
+          // name the step's entry does not declare. Without the declaration here, every such step
+          // would read as one whose check threw — a finding about this probe rather than the step.
+          publishes: pair.value.publishes,
+          fixture: fixtures[pair.key.value],
+        );
+        coverage[pair.key.value] = _leastCoveredOf(
+          coverage[pair.key.value],
+          _under(describeSetting(arguments, pair.value.arguments), seen),
+        );
       }
-      coverage[pair.key.value] = await runTwice(
-        pair.key,
-        step,
-        plausibleArguments(pair.value.arguments),
-        answers: answersForProbe(answers, pair.value.arguments),
-        // A step that measures does it inside the check this runs twice, and the sink refuses a
-        // name the step's entry does not declare. Without the declaration here, every such step
-        // would read as one whose check threw — a finding about this probe rather than the step.
-        publishes: pair.value.publishes,
-        fixture: fixtures[pair.key.value],
-      );
     }
-    return IdempotenceReading(coverage: coverage, problems: problems);
+    return IdempotenceReading(coverage: coverage, settings: settings, problems: problems);
   }
 }
+
+/// [seen] with the [setting] it was seen under named in what a person reads.
+///
+/// A step driven under one setting only reads exactly as it did before there was more than one, so
+/// the setting appears in a report precisely where it changes what happened.
+Coverage _under(String setting, Coverage seen) {
+  if (setting.isEmpty) {
+    return seen;
+  }
+  return switch (seen) {
+    Exercised(:final String why) => Exercised('under $setting, $why'),
+    OnlyMeasures(:final String why) => OnlyMeasures('under $setting, $why'),
+    SendsTheExchangeAgain(:final String why) => SendsTheExchangeAgain(why),
+    NotCovered(:final String why) => NotCovered('under $setting, $why'),
+    WouldRepeat(:final String why) => WouldRepeat('under $setting, $why'),
+  };
+}
+
+/// Whichever of [before] and [now] shows LESS about the step.
+///
+/// A step is only as covered as its worst setting. The order is the order of what a reader has to
+/// act on: work done twice first, then a setting nothing could exercise, then the two buckets a
+/// step's KIND decides — which answer the same under every setting — and an exercised step last,
+/// because any other answer beside it is the one worth reporting.
+Coverage _leastCoveredOf(Coverage? before, Coverage now) {
+  if (before == null) {
+    return now;
+  }
+  return _rankOf(now) > _rankOf(before) ? now : before;
+}
+
+int _rankOf(Coverage coverage) => switch (coverage) {
+  WouldRepeat() => 3,
+  NotCovered() => 2,
+  Exercised() => 1,
+  OnlyMeasures() => 0,
+  SendsTheExchangeAgain() => 0,
+};
 
 /// What a whole registry did on its second run.
 final class IdempotenceReading {
   /// Records the coverage of every step that could be built, and what could not.
-  const IdempotenceReading({required this.coverage, required this.problems});
+  const IdempotenceReading({
+    required this.coverage,
+    required this.settings,
+    required this.problems,
+  });
 
   /// What each step did, by the name a program file writes.
   final Map<String, Coverage> coverage;
 
+  /// How many settings each step was driven under, by the name a program file writes.
+  ///
+  /// Stated so a reader can see that a step declaring a flag with no value of its own really was
+  /// driven both ways. A tree where every one of these is 1 has probed one half of every such step,
+  /// which is what a run looked like for as long as the probe invented the value.
+  final Map<String, int> settings;
+
   /// Steps nothing could be measured about.
   final List<Finding> problems;
+
+  /// How many times a step was run twice, over every step and every setting.
+  int get drives => settings.values.fold(0, (int total, int each) => total + each);
+
+  /// The steps driven under more than one setting, sorted.
+  List<String> get drivenBothWays => <String>[
+    for (final MapEntry<String, int> pair in settings.entries)
+      if (pair.value > 1) pair.key,
+  ]..sort();
 
   /// The steps a fake machine could not exercise, sorted.
   ///
   /// Not a pass and not a failure: a step nothing here has shown anything about.
   List<String> get notCoveredNames => _namesOf<NotCovered>();
+
+  /// The same steps, each with the reason it could not be exercised, sorted.
+  ///
+  /// What a person needs to act on one: a name alone leaves them to work out which of the fake
+  /// machine, the fixture or the setting the step was driven under is the one that did not reach.
+  List<String> get notCoveredReasons => <String>[
+    for (final MapEntry<String, Coverage> pair in coverage.entries)
+      if (pair.value case NotCovered(:final String why)) '${pair.key} — $why',
+  ]..sort();
 
   /// The steps that were applied and then answered satisfied, sorted.
   List<String> get exercisedNames => _namesOf<Exercised>();

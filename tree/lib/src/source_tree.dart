@@ -29,6 +29,20 @@ const Set<String> prunedDirectories = <String>{
 /// The lines of [text], without their terminators.
 List<String> linesOf(String text) => const LineSplitter().convert(text);
 
+/// The line, counted from one, that [offset] of [text] sits on.
+///
+/// What a scan reading its subject by OFFSET — a bracket-counted region, a match somewhere in the
+/// middle of a multi-line call — needs to name a finding the way a reader opens it: `path:line`.
+int lineAt(String text, int offset) {
+  int line = 1;
+  for (int i = 0; i < offset && i < text.length; i++) {
+    if (text.codeUnitAt(i) == 0x0A) {
+      line++;
+    }
+  }
+  return line;
+}
+
 /// The repository this test suite is part of.
 ///
 /// `dart test` runs with the package directory as the working directory, and the package is the

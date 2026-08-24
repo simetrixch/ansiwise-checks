@@ -12,11 +12,17 @@ import '../source_tree.dart';
 /// [scannedPaths] are the directories read, named one at a time by the caller rather than derived,
 /// so widening the scan is a decision somebody makes rather than a silent change.
 ///
-/// WHAT IT STATES: how many files were read, how many argument reads were found, and how many
-/// files-port calls in how many elevation-carrying files. A scan that found no read at all would
-/// pass over any tree, and a scan that read no file looked nowhere — either would report a clean
-/// tree while measuring nothing. The call count may honestly be zero: a tree in which no file
-/// carries the elevation field has nothing for that half to judge, and the count says so out loud.
+/// WHAT IT STATES: how many files were read, how many argument reads were found, and how many calls
+/// of EACH PORT in how many elevation-carrying files. A scan that found no read at all would pass
+/// over any tree, and a scan that read no file looked nowhere — either would report a clean tree
+/// while measuring nothing.
+///
+/// **The two port counts are stated separately because one of them was zero for as long as the scan
+/// existed.** The second hop judged the files port alone, so every command a step composed went
+/// unjudged while the run printed a clean tree — and a summed count would have shown a large,
+/// reassuring number the whole time. Either may honestly be zero: a tree whose steps only write
+/// files composes no command, and a tree in which no file carries the elevation field has nothing
+/// for this half at all. What matters is that the number is on the screen rather than inside a sum.
 void auditCarriedArguments({required List<String> scannedPaths, SourceTree? tree}) {
   final SourceTree judged = tree ?? SourceTree.on(repositoryRoot());
   final CarriedArguments scan = CarriedArguments(tree: judged, scanned: scannedPaths);
@@ -37,8 +43,9 @@ void auditCarriedArguments({required List<String> scannedPaths, SourceTree? tree
     );
   });
 
-  test('${scan.calls.length} files-port call(s) in ${carriers.length} file(s) carrying the '
-      'elevation field were found to judge', () {
+  test('${scan.filesPortCalls.length} files-port call(s) and ${scan.commandCalls.length} '
+      'command(s) composed in ${carriers.length} file(s) carrying the elevation field were found '
+      'to judge', () {
     if (carriers.isEmpty) {
       // Nothing here carries the field, so there is nothing this half can judge — a fact the
       // name of this test states rather than hides. That the shape is still recognised when it
@@ -50,13 +57,13 @@ void auditCarriedArguments({required List<String> scannedPaths, SourceTree? tree
       scan.calls,
       isNotEmpty,
       reason:
-          'a file here carries the elevation field and no files-port call was seen beside it — '
-          'either the call shape stopped matching, or this tree genuinely makes none and this '
-          'expectation is wrong for it',
+          'a file here carries the elevation field and no call was seen beside it through either '
+          'port — either both call shapes stopped matching, or every such file here hands the '
+          'elevation to a helper of its own, which this scan does not follow',
     );
   });
 
-  test('every read is declared, and every carried elevation reaches every files-port call', () {
+  test('every read is declared, and every carried elevation reaches every call', () {
     expect(scan.findings, isEmpty, reason: scan.findings.join('; '));
   });
 
@@ -304,6 +311,150 @@ final class Subject {
 final class Subject {
   Future<void> apply(StepContext context) async {
     await context.files.delete(path);
+  }
+}
+''';
+
+      expect(CarriedArguments.findingsIn(planted, 'lib/subject.dart'), isEmpty);
+    });
+
+    // THE SECOND HOP THROUGH THE OTHER PORT: a carried elevation dropped where a command is
+    // composed. The files port was the only one judged for as long as this scan existed.
+    test('a command composed without the elevation the file carries is reported', () {
+      // The exact shape found on 2026-08-24: the step asked the cluster for its credentials as the
+      // account the run started as, on a machine that had put that account into the group granting
+      // access one step earlier. Supplementary groups are read once, when a session starts, so the
+      // command was refused and the same program passed on its second run.
+      const String planted = '''
+final class Subject {
+  const Subject({required this.credentialsCommand, this.elevated = false});
+
+  final List<String> credentialsCommand;
+
+  final bool elevated;
+
+  Future<CommandResult> ask(StepContext context) => context.shell.run(
+    Command.observing(
+      credentialsCommand.first,
+      arguments: credentialsCommand.sublist(1),
+    ),
+  );
+}
+''';
+
+      final List<Finding> found = CarriedArguments.findingsIn(planted, 'lib/subject.dart');
+
+      expect(found, hasLength(1));
+      expect(found.single.line, 9);
+      expect(found.single.what, contains('Command.observing'));
+    });
+
+    test('THE INNOCENT NEIGHBOUR: a command that carries the elevation is not reported', () {
+      const String planted = '''
+final class Subject {
+  final bool elevated;
+
+  Future<CommandResult> ask(StepContext context) => context.shell.run(
+    Command.observing(
+      credentialsCommand.first,
+      arguments: credentialsCommand.sublist(1),
+      elevated: elevated,
+    ),
+  );
+}
+''';
+
+      expect(CarriedArguments.findingsIn(planted, 'lib/subject.dart'), isEmpty);
+    });
+
+    test('an answer written out is an answer: elevated: true carries it', () {
+      // The chown that hands a directory to an account is elevated whatever the row said about the
+      // file it wrote, and a scan wanting the FIELD by name would report the one call in the tree
+      // that decided the question on purpose.
+      const String planted = '''
+final class Subject {
+  final bool elevated;
+
+  Future<void> hand(StepContext context) async {
+    await context.shell.run(
+      Command.detailed('chown', arguments: <String>['-R', owner, directory], elevated: true),
+    );
+  }
+}
+''';
+
+      expect(CarriedArguments.findingsIn(planted, 'lib/subject.dart'), isEmpty);
+    });
+
+    test('the plain constructor cannot carry it, so composing with it is reported', () {
+      // `Command(executable, arguments)` takes no elevation and fixes it to false, so a file that
+      // carries an elevation and reaches the machine through it has dropped the row's answer by
+      // choosing that constructor.
+      const String planted = '''
+final class Subject {
+  final bool elevated;
+
+  Future<void> apply(StepContext context) async {
+    await context.shell.run(const Command('systemctl', <String>['daemon-reload']));
+  }
+}
+''';
+
+      final List<Finding> found = CarriedArguments.findingsIn(planted, 'lib/subject.dart');
+
+      expect(found, hasLength(1));
+      expect(found.single.what, contains('Command call'));
+    });
+
+    test('a command composed in one method and run in another is still judged', () {
+      // Where the command is COMPOSED is what carries the elevation; `context.shell.run` only hands
+      // on what the command already says. A scan reading run's own arguments would see the
+      // elevation nowhere and report every step in the tree, and one reading the whole call would
+      // take an inner value for the outer call's answer.
+      const String planted = '''
+final class Subject {
+  final bool elevated;
+
+  Command _observe(List<String> arguments) =>
+      Command.detailed('git', arguments: arguments, observes: true);
+
+  Future<CommandResult> ask(StepContext context) => context.shell.run(_observe(argv));
+}
+''';
+
+      final List<Finding> found = CarriedArguments.findingsIn(planted, 'lib/subject.dart');
+
+      expect(found, hasLength(1));
+      expect(found.single.line, 5);
+    });
+
+    test('a command in a file that carries no elevation owes it to nobody', () {
+      const String planted = '''
+final class Subject {
+  Future<void> apply(StepContext context) async {
+    await context.shell.run(const Command('systemctl', <String>['daemon-reload']));
+  }
+}
+''';
+
+      expect(CarriedArguments.findingsIn(planted, 'lib/subject.dart'), isEmpty);
+    });
+
+    test('a result and a failure named after a command are neither of them one', () {
+      // `CommandResult` and `CommandFailed` begin with the same word, and a scan matching the word
+      // rather than the constructor would report the two places every step reads what a command
+      // did.
+      const String planted = '''
+final class Subject {
+  final bool elevated;
+
+  Future<void> apply(StepContext context) async {
+    final CommandResult answer = await context.shell.run(
+      Command.detailed('git', arguments: argv, elevated: elevated),
+    );
+    if (!answer.ok) {
+      throw CommandFailed(argv: argv, exitCode: answer.exitCode, stdout: '', stderr: '');
+    }
   }
 }
 ''';

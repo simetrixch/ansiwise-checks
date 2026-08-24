@@ -144,7 +144,12 @@ final class RegistryReading {
         );
       }
 
-      final Step? step = buildStep(entry, problems.add);
+      // ONE SETTING HERE, and it is enough for what this reads. What comes back is the CLASS an
+      // entry builds and the reason that class gives, and a factory builds the same class whatever
+      // the values were — the same reason a generic predicate is bound to its own declaration
+      // below. The audits that measure what a step DOES drive every setting; this one does not,
+      // and a reason composed out of an argument is read at one of them.
+      final Step? step = buildStep(entry, plausibleArguments(entry.arguments), problems.add);
       if (step == null) {
         continue;
       }

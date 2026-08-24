@@ -11,24 +11,35 @@
 /// all — so five steps ignored what their rows told them, on every machine, and two of them proved
 /// it by failing on a real one after the rest of the run had already happened.
 ///
-/// **A declaration written INLINE and one written as a NAMED CONSTANT are two different promises,
-/// and the tree already writes them differently.** An inline one sits in a step's own list and
-/// belongs to that step, so that step's file has to read it. A named one exists to be put in SEVERAL
-/// steps' lists — a client invocation, a status command — and is read by whoever uses it, which is
-/// never the file that declares it.
+/// **A declaration is written in three ways, and the third is the one that carries no name at all.**
+/// An INLINE one sits in a step's own list and belongs to that step, so that step's file has to read
+/// it. A NAMED CONSTANT exists to be put in SEVERAL steps' lists — a client invocation, a status
+/// command — and is read by whoever uses it, which is never the file that declares it. A LISTED one
+/// is a step putting somebody else's identifier in its own list: the framework's `elevationArgument`,
+/// or a constant a package declares once. It is that step's own declaration exactly as an inline one
+/// is, and the resolver delivers a value under it exactly the same way — but the file holds no
+/// `name:` anywhere, so a scan reading only what is written out sees a step that declares nothing.
 ///
-/// So an inline declaration is judged against its own file, and a named one against the whole scan.
-/// Judging both the same way was tried and was wrong in both directions: per file it reported three
-/// shared declarations that two neighbours read correctly, and tree-wide it would let a misspelled
-/// argument pass because some other step happens to use the same word.
+/// That is what let a step declare the elevation, carry `final bool elevated;`, never read the
+/// argument, and pass every check: the field stayed false on every machine while a program-wide
+/// default said `elevated: true`, and the command it granted root for was refused by a snap. It
+/// passed on the second run of the same program, because the account had by then started a session
+/// carrying the group it had been put into.
+///
+/// So an inline and a listed declaration are judged against their own file, and a named one against
+/// the whole scan. Judging inline and named the same way was tried and was wrong in both directions:
+/// per file it reported three shared declarations that two neighbours read correctly, and tree-wide
+/// it would let a misspelled argument pass because some other step happens to use the same word.
 ///
 /// **What this cannot do, said plainly.** It is a text scan. A file that builds its argument name out
 /// of pieces, or reads it through a constant declared somewhere else, passes without being read —
-/// and a file that merely mentions the name in a comment passes too. It is a good sample rather than
-/// a proof, and it is worth having because both of the failures above are exactly the shape it
-/// catches.
+/// and a file that merely mentions the name in a comment passes too. A listed declaration is seen
+/// only where its identifier stands bare, so a qualified one — a class's own spec, which that class
+/// reads — is left to the class that owns it. It is a good sample rather than a proof, and it is
+/// worth having because all three of the failures above are exactly the shape it catches.
 library;
 
+import 'argument_specs.dart';
 import 'finding.dart';
 import 'source_tree.dart';
 import 'word_purity.dart';
@@ -41,12 +52,13 @@ final class DeclaredArgument {
     required this.line,
     required this.name,
     this.shared = false,
+    this.identifier,
   });
 
   /// The repository-relative file the declaration sits in.
   final String path;
 
-  /// The line the declaration's name sits on, counted from one.
+  /// The line the declaration sits on, counted from one.
   final int line;
 
   /// The name a program row writes.
@@ -57,6 +69,12 @@ final class DeclaredArgument {
   /// An inline declaration sits in one step's own list and is that step's; a named one is put in
   /// several lists and is read by whoever uses it.
   final bool shared;
+
+  /// The identifier this file LISTED to declare [name], or null where the name is written out here.
+  ///
+  /// A listed declaration carries no `name:` in this file, so a finding about one has to name the
+  /// identifier the reader will find on that line.
+  final String? identifier;
 }
 
 /// Every argument declared in [scanned] that nothing in its own file reads.
@@ -73,10 +91,35 @@ final class DeclaredArguments {
   /// The files judged, which is what the count in a report is stated against.
   List<String> get files => scannedFilesOf(tree, scanned);
 
-  /// Every argument any judged file declares.
-  List<DeclaredArgument> get declared => <DeclaredArgument>[
-    for (final String path in files)
-      for (final DeclaredArgument each in argumentsDeclaredIn(tree.textOf(path) ?? '', path)) each,
+  /// The shared spec constants of the whole scan, identifier against declared name, over the
+  /// framework's own.
+  ///
+  /// A shared spec is declared in one file and listed in others, so resolving one takes the whole
+  /// scan — which is why the map is built here and handed to every file's judgement.
+  Map<String, String> get sharedSpecs =>
+      sharedSpecsOf(<String>[for (final String path in files) tree.textOf(path) ?? '']);
+
+  /// Every argument any judged file declares, however it declares it.
+  List<DeclaredArgument> get declared {
+    final Map<String, String> shared = sharedSpecs;
+    return <DeclaredArgument>[
+      for (final String path in files)
+        for (final DeclaredArgument each in argumentsDeclaredIn(
+          tree.textOf(path) ?? '',
+          path,
+          sharedSpecs: shared,
+        ))
+          each,
+    ];
+  }
+
+  /// Every declaration a file makes by LISTING an identifier somebody else declared.
+  ///
+  /// Stated beside the count of everything declared rather than folded into it, because a half that
+  /// judges nothing reads exactly like a half that found nothing.
+  List<DeclaredArgument> get listed => <DeclaredArgument>[
+    for (final DeclaredArgument each in declared)
+      if (each.identifier != null) each,
   ];
 
   /// Every declaration whose name appears nowhere else in the file that declares it.
@@ -84,40 +127,62 @@ final class DeclaredArguments {
     // Every judged file with its declarations taken out, which is where a SHARED argument is read:
     // a file declaring one for several steps to use never reads it itself, and is not meant to.
     final String everywhere = <String>[
-      for (final String path in files) _withoutSpecs(tree.textOf(path) ?? ''),
+      for (final String path in files) withoutSpecs(tree.textOf(path) ?? ''),
     ].join(' ');
+    final Map<String, String> shared = sharedSpecs;
     return <Finding>[
       for (final String path in files)
-        ...findingsIn(tree.textOf(path) ?? '', path, alsoRead: everywhere),
+        ...findingsIn(tree.textOf(path) ?? '', path, alsoRead: everywhere, sharedSpecs: shared),
     ];
   }
 
   /// The findings of one file's [text], with [alsoRead] standing for the rest of the scan.
   ///
   /// [alsoRead] is where a NAMED declaration is looked for, since it exists to be used elsewhere. An
-  /// inline one is looked for in [text] alone.
-  static List<Finding> findingsIn(String text, String path, {String alsoRead = ''}) {
-    final String hereElsewhere = _withoutSpecs(text);
+  /// inline one and a listed one are looked for in [text] alone.
+  ///
+  /// [sharedSpecs] is what an identifier listed in [text] is resolved against. The default is the
+  /// framework's own map, which is in scope for every file of every tree.
+  static List<Finding> findingsIn(
+    String text,
+    String path, {
+    String alsoRead = '',
+    Map<String, String> sharedSpecs = frameworkSharedSpecs,
+  }) {
+    final String hereElsewhere = withoutSpecs(text);
     return <Finding>[
-      for (final DeclaredArgument each in argumentsDeclaredIn(text, path))
+      for (final DeclaredArgument each in argumentsDeclaredIn(text, path, sharedSpecs: sharedSpecs))
         if (!(each.shared ? '$hereElsewhere$alsoRead' : hereElsewhere).contains("'${each.name}'"))
-          Finding(
-            path,
-            each.shared
-                ? 'declares the shared argument "${each.name}" and nothing in the whole scan reads '
-                      'it — a row writing it is accepted and then ignored, which reports success '
-                      'for work that did not happen'
-                : 'declares the argument "${each.name}" and nothing in this file reads it — a row '
-                      'writing it is accepted and then ignored, which reports success for work that '
-                      'did not happen',
-            line: each.line,
-          ),
+          Finding(path, _whatIsWrong(each), line: each.line),
     ];
   }
 }
 
-/// The arguments declared in [text], with the line each name sits on.
-List<DeclaredArgument> argumentsDeclaredIn(String text, String path) {
+/// What a declaration nothing reads costs, in the words a reader decides from.
+String _whatIsWrong(DeclaredArgument declaration) {
+  const String ignored =
+      'is accepted and then ignored, which reports success for work that did not happen';
+  if (declaration.identifier case final String identifier) {
+    return 'lists "$identifier", which declares the argument "${declaration.name}", and nothing in '
+        'this file reads it — the resolver delivers a value under every name a step declares, so a '
+        'row or a program-wide default writing it $ignored';
+  }
+  return declaration.shared
+      ? 'declares the shared argument "${declaration.name}" and nothing in the whole scan reads it '
+            '— a row writing it $ignored'
+      : 'declares the argument "${declaration.name}" and nothing in this file reads it — a row '
+            'writing it $ignored';
+}
+
+/// The arguments declared in [text], with the line each sits on.
+///
+/// [sharedSpecs] is what an identifier listed here is resolved against: listing one declares the
+/// argument it names, for this file, exactly as writing the name out would.
+List<DeclaredArgument> argumentsDeclaredIn(
+  String text,
+  String path, {
+  Map<String, String> sharedSpecs = frameworkSharedSpecs,
+}) {
   final List<String> lines = text.split('\n');
   final List<DeclaredArgument> found = <DeclaredArgument>[];
   bool inSpec = false;
@@ -149,38 +214,12 @@ List<DeclaredArgument> argumentsDeclaredIn(String text, String path) {
       inSpec = false;
     }
   }
-  return found;
-}
-
-/// [text] with every `ArgumentSpec(...)` taken out, so what is left is where a read would be.
-///
-/// Removed by counting brackets rather than by a pattern, because a spec's `describes` runs over
-/// several lines and carries brackets of its own.
-String _withoutSpecs(String text) {
-  final StringBuffer kept = StringBuffer();
-  int i = 0;
-  while (true) {
-    final int start = text.indexOf('ArgumentSpec(', i);
-    if (start < 0) {
-      kept.write(text.substring(i));
-      return kept.toString();
-    }
-    kept.write(text.substring(i, start));
-    int depth = 0;
-    int j = start + 'ArgumentSpec'.length;
-    for (; j < text.length; j++) {
-      if (text[j] == '(') {
-        depth++;
-      } else if (text[j] == ')') {
-        depth--;
-        if (depth == 0) {
-          j++;
-          break;
-        }
-      }
-    }
-    i = j;
+  for (final ListedSpec each in sharedSpecsListedIn(text, sharedSpecs: sharedSpecs).values) {
+    found.add(
+      DeclaredArgument(path: path, line: each.line, name: each.name, identifier: each.identifier),
+    );
   }
+  return found;
 }
 
 /// The name a `name: '…'` line carries, or null where the line is not one.

@@ -119,40 +119,104 @@ final class DrySafety {
   final Arguments answers;
 
   /// What each step did, by the name a program file writes.
+  ///
+  /// **Every step is asked once per SETTING it has**, which is one combination of the flags it
+  /// declares with no value of their own, and it is BUILT again for each. A step is reported as the
+  /// worst thing any setting showed: a mutation that reaches the machine under one of them reaches
+  /// it, and a dry run that was clean under the other says nothing about that.
   Future<DryRunReading> askEveryStep() async {
     final Map<String, DryRunOutcome> outcomes = <String, DryRunOutcome>{};
+    final Map<String, int> settings = <String, int>{};
     final List<Finding> problems = <Finding>[];
     for (final MapEntry<StepName, RegisteredStep> pair in registry.steps.entries) {
-      final Step? step = buildStep(pair.value, problems.add);
-      if (step == null) {
-        continue;
+      final List<Arguments> asked = plausibleArgumentSettings(pair.value.arguments);
+      settings[pair.key.value] = asked.length;
+      for (final Arguments arguments in asked) {
+        final Step? step = buildStep(pair.value, arguments, problems.add);
+        if (step == null) {
+          continue;
+        }
+        final DryRunOutcome seen = await askWhatItWouldDo(
+          pair.key,
+          step,
+          arguments,
+          answers: answersForProbe(answers, pair.value.arguments),
+          // A step that measures does it inside the check this asks, and the sink refuses a name the
+          // step's entry does not declare. Without the declaration here every such step would come
+          // back as one whose check threw — a finding about this probe rather than about the step.
+          publishes: pair.value.publishes,
+          wrapInPlanningPorts: true,
+        );
+        outcomes[pair.key.value] = _worseOf(
+          outcomes[pair.key.value],
+          _under(describeSetting(arguments, pair.value.arguments), seen),
+        );
       }
-      outcomes[pair.key.value] = await askWhatItWouldDo(
-        pair.key,
-        step,
-        plausibleArguments(pair.value.arguments),
-        answers: answersForProbe(answers, pair.value.arguments),
-        // A step that measures does it inside the check this asks, and the sink refuses a name the
-        // step's entry does not declare. Without the declaration here every such step would come
-        // back as one whose check threw — a finding about this probe rather than about the step.
-        publishes: pair.value.publishes,
-        wrapInPlanningPorts: true,
-      );
     }
-    return DryRunReading(outcomes: outcomes, problems: problems);
+    return DryRunReading(outcomes: outcomes, settings: settings, problems: problems);
   }
 }
+
+/// [seen] with the [setting] it was seen under named in what a person reads.
+DryRunOutcome _under(String setting, DryRunOutcome seen) {
+  if (setting.isEmpty) {
+    return seen;
+  }
+  return switch (seen) {
+    ProducedAPlan(:final String summary) => ProducedAPlan('under $setting, $summary'),
+    AnsweredOnTrust(:final String summary) => AnsweredOnTrust('under $setting, $summary'),
+    RefusedByAPort(:final String what) => RefusedByAPort('under $setting, $what'),
+    ReachedTheMachine(:final List<String> evidence) => ReachedTheMachine(<String>[
+      for (final String each in evidence) 'under $setting, $each',
+    ]),
+    NeitherPlannedNorRefused(:final String what) => NeitherPlannedNorRefused(
+      'under $setting, $what',
+    ),
+  };
+}
+
+/// Whichever of [before] and [now] a reader has to act on first.
+///
+/// A step is only as safe as its worst setting: something that changed the machine outranks an
+/// answer nobody could read, which outranks an answer resting on the row's word, which outranks the
+/// two clean ones.
+DryRunOutcome _worseOf(DryRunOutcome? before, DryRunOutcome now) {
+  if (before == null) {
+    return now;
+  }
+  return _rankOf(now) > _rankOf(before) ? now : before;
+}
+
+int _rankOf(DryRunOutcome outcome) => switch (outcome) {
+  ReachedTheMachine() => 3,
+  NeitherPlannedNorRefused() => 2,
+  AnsweredOnTrust() => 1,
+  ProducedAPlan() => 0,
+  RefusedByAPort() => 0,
+};
 
 /// What a whole registry did under a dry run.
 final class DryRunReading {
   /// Records the outcome of every step that could be built, and what could not.
-  const DryRunReading({required this.outcomes, required this.problems});
+  const DryRunReading({required this.outcomes, required this.settings, required this.problems});
 
   /// What each step did, by the name a program file writes.
   final Map<String, DryRunOutcome> outcomes;
 
+  /// How many settings each step was asked under, by the name a program file writes.
+  final Map<String, int> settings;
+
   /// Steps nothing could be measured about.
   final List<Finding> problems;
+
+  /// How many times a step was asked, over every step and every setting.
+  int get asks => settings.values.fold(0, (int total, int each) => total + each);
+
+  /// The steps asked under more than one setting, sorted.
+  List<String> get askedBothWays => <String>[
+    for (final MapEntry<String, int> pair in settings.entries)
+      if (pair.value > 1) pair.key,
+  ]..sort();
 
   /// How many steps produced a plan or were refused with nothing reaching the machine.
   ///

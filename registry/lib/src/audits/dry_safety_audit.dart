@@ -19,9 +19,12 @@ import '../dry_safety.dart';
 /// installation's programs declare for the answers THIS registry's steps say they read — which is
 /// nothing at all for a registry whose steps read none, and then no installation tree is opened.
 ///
-/// WHAT IT STATES: how many steps were asked, how many produced a plan or were refused with nothing
-/// reaching the machine, and which ones answered on the row's word. A reading that covered no step
-/// would leave every assertion unmade and the audit would be green for having looked at nothing.
+/// WHAT IT STATES: how many steps were asked, under how many argument settings and how many of them
+/// under both values of a flag they declare with no value of its own, how many produced a plan or
+/// were refused with nothing reaching the machine, and which ones answered on the row's word. A
+/// reading that covered no step would leave every assertion unmade and the audit would be green for
+/// having looked at nothing — and one that reached only one half of every flag would be green for
+/// having looked at half of each step.
 Future<void> auditDrySafety(
   Registry registry, {
   required List<String> answeringOnTrust,
@@ -45,7 +48,8 @@ Future<void> auditDrySafety(
   final DryRunReading reading = await check.askEveryStep();
 
   test('${reading.outcomes.length} of ${registry.steps.length} step(s) were asked what they '
-      'would do', () {
+      'would do, over ${reading.asks} argument setting(s), ${reading.askedBothWays.length} step(s) '
+      'of them under both values of a flag they declare with no value of its own', () {
     expect(
       reading.outcomes,
       hasLength(registry.steps.length),
@@ -198,7 +202,122 @@ Future<void> auditDrySafety(
         reason: 'a finding that does not say what was changed is one nobody can act on',
       );
     });
+
+    test('the write only the elevated branch makes is reached, and refused there', () async {
+      // THE SETTING THE PROBE NEVER HANDED ANY STEP. Under `elevated: false` this one only looks,
+      // so a run that drove that value alone exercised the ports against a step that never asked
+      // anything of them — and the branch a whole deployment actually runs, since the
+      // installation's own program sets `elevated: true` for every row of it, met nothing.
+      expect(
+        await _ask(const WritesOnlyWhenElevated(elevated: false), wrapInPlanningPorts: true),
+        isA<ProducedAPlan>(),
+        reason: 'the unelevated branch of this step only looks, and was reported as something else',
+      );
+      expect(
+        await _ask(const WritesOnlyWhenElevated(elevated: true), wrapInPlanningPorts: true),
+        isA<RefusedByAPort>(),
+        reason:
+            'the elevated branch writes from its check, and a dry run that neither refused it nor '
+            'reported it never reached that branch at all',
+      );
+    });
+
+    test('a step that can only answer in one of its branches is asked in both', () async {
+      // What the reading reports when the two settings disagree: the step is as unsafe as its worst
+      // one, and the finding names WHICH value of the flag it was under.
+      final DryRunReading reading = await _readingOf(
+        (Arguments arguments) => CannotAnswerWhenElevated(elevated: arguments.flag('elevated')),
+      );
+
+      expect(reading.settings['planted'], 2);
+      expect(reading.outcomes['planted'], isA<NeitherPlannedNorRefused>());
+      expect(reading.findings.single.what, contains('elevated: true'));
+    });
+
+    test('THE INNOCENT NEIGHBOUR: a step that only looks under both is left alone', () async {
+      final DryRunReading reading = await _readingOf((Arguments arguments) => const OnlyLooks());
+
+      expect(reading.settings['planted'], 2);
+      expect(reading.outcomes['planted'], isA<ProducedAPlan>());
+      expect(reading.findings, isEmpty);
+    });
   });
+}
+
+/// The whole audit run over one planted step that declares the elevation, and nothing else.
+///
+/// A registry rather than a bare step, because what is being probed is the part that decides how
+/// many times a step is asked and what it is handed each time.
+Future<DryRunReading> _readingOf(Step Function(Arguments arguments) create) => DrySafety(
+  registry: Registry(
+    steps: <StepName, RegisteredStep>{
+      const StepName('planted'): RegisteredStep(
+        name: const StepName('planted'),
+        source: 'lib/planted.dart:1',
+        create: create,
+        arguments: const <ArgumentSpec>[elevationArgument],
+      ),
+    },
+    predicates: const <PredicateName, RegisteredPredicate>{},
+  ),
+).askEveryStep();
+
+/// A step that only looks where the row granted no elevation, and writes where it did.
+final class WritesOnlyWhenElevated extends IrreversibleStep {
+  /// Creates the planted step, writing from its check where [elevated].
+  const WritesOnlyWhenElevated({required this.elevated});
+
+  /// Where it writes, so a counter-probe can name what got through.
+  static const String path = '/etc/planted-as-root';
+
+  /// Whether the row granted elevation.
+  final bool elevated;
+
+  @override
+  String get irreversibleReason => 'it is a probe and is never run against a machine';
+
+  @override
+  Future<CheckResult> check(StepContext context) async {
+    if (elevated) {
+      await context.files.write(path, 'written from a check', mode: 0x180, elevated: elevated);
+    }
+    return const CheckResult.ready();
+  }
+
+  @override
+  Future<StepPlan> plan(StepContext context) async => const StepPlan.nothing('would look');
+
+  @override
+  Future<void> apply(StepContext context) async {}
+}
+
+/// A step that cannot say what it would do where the row granted elevation.
+///
+/// Neither planned nor refused is the outcome nobody can act on: what such a step would do to a
+/// machine is unknown, and a run that only ever drove the other branch reports it as safe.
+final class CannotAnswerWhenElevated extends IrreversibleStep {
+  /// Creates the planted step, unable to plan where [elevated].
+  const CannotAnswerWhenElevated({required this.elevated});
+
+  /// Whether the row granted elevation.
+  final bool elevated;
+
+  @override
+  String get irreversibleReason => 'it is a probe and is never run against a machine';
+
+  @override
+  Future<CheckResult> check(StepContext context) async => const CheckResult.ready();
+
+  @override
+  Future<StepPlan> plan(StepContext context) async {
+    if (elevated) {
+      throw StateError('this branch does not know what it would change');
+    }
+    return const StepPlan.nothing('would look');
+  }
+
+  @override
+  Future<void> apply(StepContext context) async {}
 }
 
 Future<DryRunOutcome> _ask(Step step, {required bool wrapInPlanningPorts}) => askWhatItWouldDo(
