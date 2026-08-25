@@ -14,6 +14,7 @@ library;
 
 export 'src/analysis.dart';
 export 'src/argument_specs.dart';
+export 'src/captured_refusal.dart';
 export 'src/carried_arguments.dart';
 export 'src/dart_body.dart';
 export 'src/dart_code.dart';

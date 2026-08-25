@@ -7,6 +7,7 @@
 library;
 
 export 'src/audits/analysis_audit.dart';
+export 'src/audits/captured_refusal_audit.dart';
 export 'src/audits/carried_arguments_audit.dart';
 export 'src/audits/case_sensitivity_audit.dart';
 export 'src/audits/declared_checks_audit.dart';

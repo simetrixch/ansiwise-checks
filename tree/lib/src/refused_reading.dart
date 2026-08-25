@@ -241,20 +241,6 @@ final class _Judgement {
   final List<Finding> findings;
 }
 
-/// One declaration of a file: what it is called, and the region its body covers.
-final class _Declaration {
-  const _Declaration({required this.name, required this.parameters, required this.body});
-
-  final String name;
-
-  /// The parameter list, which is one of the two places a declaration comes to hold a reading. It
-  /// stands OUTSIDE the body, so a scan reading the body alone sees no reading in a helper that was
-  /// handed one.
-  final CodeRegion parameters;
-
-  final CodeRegion body;
-}
-
 /// One branch a refusal reaches, and the way it got there.
 final class _Reached {
   const _Reached({required this.region, required this.readingLine, required this.through});
@@ -281,7 +267,7 @@ final class _Fold {
 /// Judges one file, over [codeOf] rather than over the text as written.
 _Judgement _judge(String text, String path) {
   final String code = codeOf(text);
-  final List<_Declaration> declarations = _declarationsIn(code);
+  final List<DartDeclaration> declarations = declarationsIn(code);
 
   final List<Reading> readings = <Reading>[
     for (final RegExpMatch match in _readingHeld.allMatches(code))
@@ -297,7 +283,9 @@ _Judgement _judge(String text, String path) {
       SatisfiedAnswer(
         path: path,
         line: lineAt(code, match.start),
-        insideDeclaration: declarations.any((_Declaration each) => each.body.covers(match.start)),
+        insideDeclaration: declarations.any(
+          (DartDeclaration each) => each.body.covers(match.start),
+        ),
       ),
   ];
 
@@ -308,9 +296,9 @@ _Judgement _judge(String text, String path) {
   final Map<String, List<_Fold>> folds = <String, List<_Fold>>{};
   for (int round = 0; round <= declarations.length; round++) {
     bool moved = false;
-    for (final _Declaration declaration in declarations) {
+    for (final DartDeclaration declaration in declarations) {
       for (final _Reached reached in _reachedIn(code, declaration, folds)) {
-        final FoldedAnswer? answer = _answeredIn(code, reached.region);
+        final FoldedAnswer? answer = answeredIn(code, reached.region);
         if (answer == null) {
           continue;
         }
@@ -334,7 +322,7 @@ _Judgement _judge(String text, String path) {
 
   final List<Refusal> refusals = <Refusal>[];
   final List<Finding> found = <Finding>[];
-  for (final _Declaration declaration in declarations) {
+  for (final DartDeclaration declaration in declarations) {
     for (final _Reached reached in _reachedIn(code, declaration, folds)) {
       refusals.add(
         Refusal(
@@ -406,17 +394,18 @@ bool _remember(Map<String, List<_Fold>> folds, String name, _Fold fold) {
 
 /// Every branch a refusal reaches inside [declaration], given what the file's declarations are
 /// known to fold so far.
-List<_Reached> _reachedIn(String code, _Declaration declaration, Map<String, List<_Fold>> folds) {
+List<_Reached> _reachedIn(
+  String code,
+  DartDeclaration declaration,
+  Map<String, List<_Fold>> folds,
+) {
   final String body = code.substring(declaration.body.start, declaration.body.end);
   final int base = declaration.body.start;
   // The parameter list is read for the readings and the body for everything else, because a
   // declaration HOLDS a reading it was handed exactly as it holds one it assigned.
-  final Set<String> held = <String>{
-    for (final RegExpMatch match in _readingHeld.allMatches(
-      code.substring(declaration.parameters.start, declaration.body.end),
-    ))
-      match.group(2)!,
-  };
+  final Set<String> held = readingNamesIn(
+    code.substring(declaration.parameters.start, declaration.body.end),
+  );
   final Map<String, String> bound = <String, String>{
     for (final RegExpMatch match in _boundToCall.allMatches(body)) match.group(1)!: match.group(2)!,
   };
@@ -438,14 +427,14 @@ List<_Reached> _reachedByCondition(
   Map<String, List<_Fold>> folds,
 ) {
   final List<_Reached> reached = <_Reached>[];
-  for (final RegExpMatch opening in _ifOpening.allMatches(body)) {
+  for (final RegExpMatch opening in ifOpening.allMatches(body)) {
     final int openBracket = opening.end - 1;
     final String whole = balancedFrom(body, openBracket);
     if (whole.length < 2) {
       continue;
     }
     final String condition = whole.substring(1, whole.length - 1);
-    final CodeRegion? guarded = _guardedAfter(code, base + openBracket + whole.length);
+    final CodeRegion? guarded = guardedAfter(code, base + openBracket + whole.length);
     if (guarded == null) {
       continue;
     }
@@ -453,7 +442,7 @@ List<_Reached> _reachedByCondition(
 
     // The reading this declaration holds itself, asked whether it answered.
     for (final String name in held) {
-      if (_refusedIn(condition, name)) {
+      if (refusesIn(condition, name)) {
         reached.add(_Reached(region: guarded, readingLine: line, through: const <String>[]));
       }
     }
@@ -490,22 +479,22 @@ List<_Reached> _reachedByCondition(
 /// written as one expression, and a scan reading only `if` statements would be blind to it.
 List<_Reached> _reachedByTernary(String code, int base, String body, Set<String> held) {
   final List<_Reached> reached = <_Reached>[];
-  for (final RegExpMatch opening in _returnOpening.allMatches(body)) {
+  for (final RegExpMatch opening in returnOpening.allMatches(body)) {
     final int? end = endOfExpression(body, opening.start);
     if (end == null) {
       continue;
     }
     final String statement = body.substring(opening.end, end - 1);
-    final int? question = _topLevelAt(statement, '?');
+    final int? question = topLevelAt(statement, '?');
     if (question == null) {
       continue;
     }
-    final int? colon = _topLevelAt(statement, ':', from: question + 1);
+    final int? colon = topLevelAt(statement, ':', from: question + 1);
     if (colon == null) {
       continue;
     }
     final String condition = statement.substring(0, question);
-    if (!held.any((String name) => _asksOk(condition, name))) {
+    if (!held.any((String name) => asksOk(condition, name))) {
       continue;
     }
     reached.add(
@@ -519,24 +508,14 @@ List<_Reached> _reachedByTernary(String code, int base, String body, Set<String>
   return reached;
 }
 
-/// The statement or block guarded by a condition that closes at [from].
-CodeRegion? _guardedAfter(String code, int from) {
-  final int at = pastWhitespace(code, from);
-  if (at >= code.length) {
-    return null;
-  }
-  final int? end = code.startsWith('{', at) ? endOfBlock(code, at) : endOfExpression(code, at);
-  return end == null ? null : CodeRegion(start: at, end: end);
-}
-
 /// The value [region] answers, or null where it answers something that is not a bare value.
 ///
 /// A branch that throws, that answers a refusal the framework carries, or that hands back anything
 /// built out of the refusal's own words answers no bare value — so nothing travels on from it, and
 /// that is the whole of the house treatment as this scan sees it.
-FoldedAnswer? _answeredIn(String code, CodeRegion region) {
+FoldedAnswer? answeredIn(String code, CodeRegion region) {
   final String inside = code.substring(region.start, region.end);
-  final RegExpMatch? returned = _returnOpening.firstMatch(inside);
+  final RegExpMatch? returned = returnOpening.firstMatch(inside);
   final int? returnEnds = returned == null ? null : endOfExpression(inside, returned.start);
   if (returned != null && returnEnds == null) {
     return null;
@@ -556,11 +535,11 @@ FoldedAnswer? _answeredIn(String code, CodeRegion region) {
 
 /// Whether [condition] asks [name] whether its reading was taken and takes the branch where it was
 /// not.
-bool _refusedIn(String condition, String name) =>
+bool refusesIn(String condition, String name) =>
     RegExp('!\\s*${RegExp.escape(name)}\\s*\\.\\s*ok(?![\\w\$])').hasMatch(condition);
 
 /// Whether [condition] mentions [name]'s `ok` at all, which is what makes a ternary a fold.
-bool _asksOk(String condition, String name) =>
+bool asksOk(String condition, String name) =>
     RegExp('(?<![\\w\$])${RegExp.escape(name)}\\s*\\.\\s*ok(?![\\w\$])').hasMatch(condition);
 
 /// Whether [condition] takes the branch [name] carries when it holds [answer].
@@ -596,56 +575,6 @@ bool _selectsCall(String condition, String name, FoldedAnswer answer) {
   };
 }
 
-/// The offset of [token] in [expression] at bracket depth zero, from [from], or null where it
-/// stands at no such place.
-///
-/// A `?` belonging to a nullable type, to `?.` or to `??` is not the `?` of a ternary, and neither
-/// is a `:` of `::` or of a named argument inside a bracket. Both are stepped over here rather than
-/// left to a pattern, because a call written across four lines carries several of each.
-int? _topLevelAt(String expression, String token, {int from = 0}) {
-  int depth = 0;
-  for (int i = from; i < expression.length; i++) {
-    final String char = expression[i];
-    if (char == '(' || char == '[' || char == '{') {
-      depth++;
-      continue;
-    }
-    if (char == ')' || char == ']' || char == '}') {
-      depth--;
-      continue;
-    }
-    if (depth != 0 || char != token) {
-      continue;
-    }
-    if (token == '?') {
-      final String next = i + 1 < expression.length ? expression[i + 1] : ' ';
-      final String previous = i > 0 ? expression[i - 1] : ' ';
-      if (next == '?' || next == '.' || next == '[' || previous == '?') {
-        continue;
-      }
-    }
-    return i;
-  }
-  return null;
-}
-
-/// Every declaration of [code] that has a parameter list and a body.
-///
-/// A name followed by a bracket pair is a declaration exactly where a BODY follows the pair: a call
-/// is followed by `;`, by `,` or by a bracket, and never by `{`, by `=>` or by an initializer list.
-/// The words Dart spells a control structure with are left out by name, because `if (…) {` has the
-/// same shape and names no declaration.
-List<_Declaration> _declarationsIn(String code) => <_Declaration>[
-  for (final RegExpMatch match in _nameThenBracket.allMatches(code))
-    if (!_notADeclaration.contains(match.group(1)))
-      if (bodyAfter(code, match.end - 1) case final CodeRegion body)
-        _Declaration(
-          name: match.group(1)!,
-          parameters: CodeRegion(start: match.end - 1, end: body.start),
-          body: body,
-        ),
-];
-
 /// A value of one of [readingTypes], bound to a name.
 ///
 /// Every way a declaration comes to HOLD one is the same shape: a local it assigns, a field it
@@ -667,41 +596,19 @@ final RegExp _boundToCall = RegExp(
   r'([a-zA-Z_$][\w$]*)\s*\(',
 );
 
+/// The names [code] binds a reading of the machine to.
+///
+/// Every way a declaration comes to HOLD one is here: a local it assigns, a field it keeps, and a
+/// PARAMETER it is handed. It is read from ONE place so that every scan judging a refusal agrees on
+/// what a reading is: two readers of this would agree on the day they were written and drift
+/// afterwards, and the drift is silent, because a reader that stops recognising a reading makes its
+/// scan come back clean.
+Set<String> readingNamesIn(String code) => <String>{
+  for (final RegExpMatch match in _readingHeld.allMatches(code)) match.group(2)!,
+};
+
 /// The framework's satisfied answer, however it is spelled.
 final RegExp _satisfied = RegExp('(?<![\\w\$])${RegExp.escape(satisfiedAnswer)}\\s*\\(');
 
-/// An `if` and the bracket its condition opens with.
-final RegExp _ifOpening = RegExp(r'(?<![\w$])if\s*\(');
-
-/// A `return` and the whitespace after it.
-final RegExp _returnOpening = RegExp(r'(?<![\w$])return\s+');
-
 /// A collection literal with nothing in it, with or without the types it is written for.
 final RegExp _emptyCollection = RegExp(r'^(?:<.*>)?(?:\[\s*\]|\{\s*\})$');
-
-/// A name followed by the bracket a parameter list would open with.
-final RegExp _nameThenBracket = RegExp(r'(?<![\w$])([a-zA-Z_$][\w$]*)\s*\(');
-
-/// The words that take a bracket and declare nothing.
-const Set<String> _notADeclaration = <String>{
-  'assert',
-  'await',
-  'case',
-  'catch',
-  'do',
-  'else',
-  'for',
-  'if',
-  'in',
-  'is',
-  'new',
-  'on',
-  'return',
-  'super',
-  'switch',
-  'this',
-  'throw',
-  'when',
-  'while',
-  'yield',
-};
