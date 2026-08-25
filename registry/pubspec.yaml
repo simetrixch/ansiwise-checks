@@ -24,11 +24,11 @@ dependencies:
   ansiwise_core:
     git:
       url: https://github.com/simetrixch/ansiwise-core.git
-      ref: 0.1.0-alpha-20260824130508
+      ref: 0.1.0-alpha-20260825002440
   ansiwise_checks_tree:
     git:
       url: https://github.com/simetrixch/ansiwise-checks.git
-      ref: 0.1.0-alpha-20260824130732
+      ref: 0.1.0-alpha-20260825074134
       path: tree
   path: ^1.9.1
   test: ^1.31.2
