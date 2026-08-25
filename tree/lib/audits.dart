@@ -15,5 +15,6 @@ export 'src/audits/exec_confinement_audit.dart';
 export 'src/audits/hosted_only_audit.dart';
 export 'src/audits/line_endings_audit.dart';
 export 'src/audits/naming_audit.dart';
+export 'src/audits/refused_reading_audit.dart';
 export 'src/audits/declared_arguments_audit.dart';
 export 'src/audits/word_purity_audit.dart';

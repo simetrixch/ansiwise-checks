@@ -33,3 +33,9 @@ tool-purity: test/checks/tool_purity_test.dart
 # dependency and gives up nothing for it, on the promise that it reaches nothing of ours — and
 # from over there it is a git dependency nothing can follow, so the promise is kept here.
 hosted-only: test/checks/hosted_only_test.dart
+
+# A reading that could not be taken never becomes a satisfied answer. A refused command comes back
+# looking exactly like "there is nothing there", and three outages were reported green by code that
+# read the first as the second. This package holds no reading of its own, so what the run proves
+# here is the scan: the counter-probes plant each shape and take it out again.
+refused-reading: test/checks/refused_reading_test.dart
