@@ -21,8 +21,13 @@ import '../source_tree.dart';
 /// existed.** The second hop judged the files port alone, so every command a step composed went
 /// unjudged while the run printed a clean tree — and a summed count would have shown a large,
 /// reassuring number the whole time. Either may honestly be zero: a tree whose steps only write
-/// files composes no command, and a tree in which no file carries the elevation field has nothing
-/// for this half at all. What matters is that the number is on the screen rather than inside a sum.
+/// files composes no command, and a tree in which nothing carries the elevation at all has nothing
+/// for this half. What matters is that the number is on the screen rather than inside a sum.
+///
+/// **The file count says CARRYING THE ELEVATION and means a field or a parameter.** It counted
+/// field-carrying files alone for a while, and a summary read off it therefore described the
+/// coverage of a scan that was looking at less — which is the failure this audit exists to refuse,
+/// one level up. The number here and the sentence the library doc writes about it move together.
 void auditCarriedArguments({required List<String> scannedPaths, SourceTree? tree}) {
   final SourceTree judged = tree ?? SourceTree.on(repositoryRoot());
   final CarriedArguments scan = CarriedArguments(tree: judged, scanned: scannedPaths);
@@ -44,12 +49,12 @@ void auditCarriedArguments({required List<String> scannedPaths, SourceTree? tree
   });
 
   test('${scan.filesPortCalls.length} files-port call(s) and ${scan.commandCalls.length} '
-      'command(s) composed in ${carriers.length} file(s) carrying the elevation field were found '
-      'to judge', () {
+      'command(s) composed in ${carriers.length} file(s) carrying the elevation in a field or in a '
+      'parameter were found to judge', () {
     if (carriers.isEmpty) {
-      // Nothing here carries the field, so there is nothing this half can judge — a fact the
-      // name of this test states rather than hides. That the shape is still recognised when it
-      // appears is proven by the counter-probes below, not by this tree.
+      // Nothing here carries the elevation either way, so there is nothing this half can judge —
+      // a fact the name of this test states rather than hides. That the shape is still recognised
+      // when it appears is proven by the counter-probes below, not by this tree.
       expect(scan.calls, isEmpty);
       return;
     }
@@ -57,9 +62,9 @@ void auditCarriedArguments({required List<String> scannedPaths, SourceTree? tree
       scan.calls,
       isNotEmpty,
       reason:
-          'a file here carries the elevation field and no call was seen beside it through either '
-          'port — either both call shapes stopped matching, or every such file here hands the '
-          'elevation to a helper of its own, which this scan does not follow',
+          'a file here carries the elevation and no call was seen beside it through either port — '
+          'either both call shapes stopped matching, or every such file here makes its calls '
+          'outside the function the elevation stands in, which is a place no elevation reaches',
     );
   });
 
@@ -460,6 +465,132 @@ final class Subject {
 ''';
 
       expect(CarriedArguments.findingsIn(planted, 'lib/subject.dart'), isEmpty);
+    });
+
+    // THE SECOND HOP WHERE THE ELEVATION STANDS IN A PARAMETER. A step hands the row's answer to a
+    // helper of its own, and the helper's file writes the field nowhere — so a gate on the field
+    // text judged no call in such a file at all, through either port.
+    test('a files-port call in a function taking the elevation drops it and is reported', () {
+      // The shape a helper reading a file for its caller has: the elevation is required, so the
+      // caller cannot leave it out, and one of the two calls beside it still does not pass it on.
+      const String planted = '''
+Future<String?> recordedValue(
+  StepContext context,
+  String file,
+  String key, {
+  required bool elevated,
+}) async {
+  if (!await context.files.exists(file)) {
+    return null;
+  }
+  final String content = await context.files.read(file, elevated: elevated);
+  return valueIn(content, key);
+}
+''';
+
+      final List<Finding> found = CarriedArguments.findingsIn(planted, 'lib/recorded_value.dart');
+
+      expect(found, hasLength(1));
+      expect(found.single.line, 7);
+      expect(found.single.what, contains('exists'));
+    });
+
+    test('THE INNOCENT NEIGHBOUR: a function that passes its own elevation on is not reported', () {
+      const String planted = '''
+Future<String?> recordedValue(
+  StepContext context,
+  String file,
+  String key, {
+  required bool elevated,
+}) async {
+  if (!await context.files.exists(file, elevated: elevated)) {
+    return null;
+  }
+  final String content = await context.files.read(file, elevated: elevated);
+  return valueIn(content, key);
+}
+''';
+
+      expect(CarriedArguments.findingsIn(planted, 'lib/recorded_value.dart'), isEmpty);
+    });
+
+    test('a command composed in a function taking the elevation drops it and is reported', () {
+      // The exact residue proven blind on 2026-08-25: a command composed by a helper, in a file
+      // that carries no field, with the row's answer standing in the helper's own parameter. The
+      // scan that judged files by the field text reported nothing here.
+      const String planted = '''
+Future<CommandResult> ask(
+  StepContext context,
+  List<String> statusCommand, {
+  bool elevated = false,
+}) async {
+  return context.shell.run(
+    Command.observing(statusCommand.first, arguments: statusCommand.sublist(1)),
+  );
+}
+''';
+
+      final List<Finding> found = CarriedArguments.findingsIn(planted, 'lib/status.dart');
+
+      expect(found, hasLength(1));
+      expect(found.single.line, 7);
+      expect(found.single.what, contains('Command.observing'));
+    });
+
+    test('an arrow body is the region an arrow function carries its elevation over', () {
+      // The other of the two body shapes. A gate that read only block bodies would judge nothing
+      // in a helper written as one expression, which is how the shortest of them are written.
+      const String planted = '''
+Future<bool> present(StepContext context, String path, {required bool elevated}) =>
+    context.files.exists(path);
+''';
+
+      final List<Finding> found = CarriedArguments.findingsIn(planted, 'lib/present.dart');
+
+      expect(found, hasLength(1));
+      expect(found.single.line, 2);
+    });
+
+    test('THE INNOCENT NEIGHBOUR: the function beside it has no elevation to pass', () {
+      // WHY THE REGION IS THE BODY AND NOT THE FILE. One function takes the elevation and the one
+      // above it does not, and the call in the second has nothing to pass on — reporting it would
+      // name a place whose only fix is to add a parameter nobody asked for, and a scan that does
+      // that gets read once and then stops being read.
+      const String planted = '''
+Future<void> writeAsOperator(StepContext context, String path, String text) async {
+  await context.files.write(path, text);
+}
+
+Future<void> writeAsRow(
+  StepContext context,
+  String path,
+  String text, {
+  required bool elevated,
+}) async {
+  await context.files.write(path, text);
+}
+''';
+
+      final List<Finding> found = CarriedArguments.findingsIn(planted, 'lib/writes.dart');
+
+      expect(found, hasLength(1));
+      expect(found.single.line, 11);
+    });
+
+    test('a parameter on a declaration with no body carries the elevation nowhere', () {
+      // An interface names the parameter and makes no call, so it opens nothing: without this the
+      // one file declaring the port surface would put every call in the file under the scan.
+      const String planted = '''
+abstract interface class FilesPort {
+  Future<bool> exists(String path, {required bool elevated});
+}
+
+Future<void> apply(StepContext context, String path) async {
+  await context.files.delete(path);
+}
+''';
+
+      expect(CarriedArguments.findingsIn(planted, 'lib/files_port.dart'), isEmpty);
     });
   });
 }

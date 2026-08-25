@@ -14,9 +14,25 @@
 /// them because their list carried `Client.elevationArgument`, a DIFFERENT argument whose constant
 /// merely ends in the same identifier, and a substring comparison took it for a declaration.
 ///
-/// **The second hop: a file carries `final bool elevated;` and one call does not pass it on.** The
-/// elevation the row granted reached the step and is dropped at the last moment: that one call acts
-/// as the operator, and a path root owns turns into a failure three steps from the reason.
+/// **The second hop: a file carries the elevation and one call does not pass it on.** The elevation
+/// the row granted reached the step and is dropped at the last moment: that one call acts as the
+/// operator, and a path root owns turns into a failure three steps from the reason.
+///
+/// **A FILE CARRIES IT IN A FIELD OR IN A PARAMETER, and for a while only the field was looked at.**
+/// A step keeps the row's answer in `final bool elevated;` and hands it to a helper of its own as a
+/// parameter, and such a helper's file writes the field nowhere — so a gate on the field text alone
+/// judged no call in it at all. Six calls stood behind that gate on 2026-08-25, one of them a shell
+/// command, and every one of them was correct, which is why the hole was worth stating before it
+/// cost a run rather than after.
+///
+/// So a call is judged wherever an elevation STANDS OVER it: anywhere in a file that writes the
+/// field exactly as [elevationField], and inside the BODY of a function whose parameter list
+/// declares `bool elevated`. Scoped to that body rather than to the whole file, because a helper
+/// taking the elevation says nothing about the function written beside it — a gate on the file
+/// would report a call that has no elevation to pass, and a scan reporting calls nobody can fix is
+/// the noise that teaches people to stop reading it. Measured over the twelve packages this audit
+/// runs in, widening the gate this way brought 3 more files and 6 more calls under the scan and
+/// reported none of them.
 ///
 /// **BOTH PORTS, because a step reaches the machine through both and the drop looks the same on
 /// either.** Through the files port the elevation is a named argument of the call itself. Through
@@ -41,11 +57,14 @@
 /// literally as `arguments.<method>('name')`, takes any bare mention of a shared spec's identifier
 /// as a declaration wherever in the file it stands, and resolves an identifier declared outside the
 /// scanned tree only where [frameworkSharedSpecs] names it. The second hop sees only calls written
-/// literally on `context.files` and commands written literally as `Command(...)`, judges only files
-/// that write the elevation field exactly as [elevationField], and a string among a call's own
-/// arguments that says `elevated` counts as passing it. A command handed to `run` as a variable, and
-/// a value handed onward through a helper of the step's own, are not followed. It is a good sample
-/// rather than a proof, and both of the failures above are exactly the shape it catches.
+/// literally on `context.files` and commands written literally as `Command(...)`, sees an elevation
+/// standing over a call only as the field written exactly as [elevationField] or as a parameter
+/// written exactly as `bool elevated`, and a string among a call's own arguments that says
+/// `elevated` counts as passing it. A command handed to `run` as a variable is not followed, and
+/// neither is the value itself: a helper the step hands the elevation to is judged on its own
+/// parameter, never on the call that fills it, so a caller passing the wrong answer is a thing this
+/// scan cannot see. It is a good sample rather than a proof, and both of the failures above are
+/// exactly the shape it catches.
 library;
 
 import 'argument_specs.dart';
@@ -134,13 +153,13 @@ final class CarriedArguments {
       for (final ArgumentRead each in argumentReadsIn(tree.textOf(path) ?? '', path)) each,
   ];
 
-  /// The judged files that carry the elevation field.
+  /// The judged files that carry the elevation, in a field or in a parameter.
   List<String> get elevationCarriers => <String>[
     for (final String path in files)
-      if ((tree.textOf(path) ?? '').contains(elevationField)) path,
+      if (_elevationScopesIn(tree.textOf(path) ?? '').isNotEmpty) path,
   ];
 
-  /// Every call of a file that carries the elevation field, through either port.
+  /// Every call an elevation stands over, through either port.
   List<PortCall> get calls => <PortCall>[
     for (final String path in files)
       for (final PortCall each in portCallsIn(tree.textOf(path) ?? '', path)) each,
@@ -227,23 +246,130 @@ List<ArgumentRead> argumentReadsIn(String text, String path) => <ArgumentRead>[
     ArgumentRead(path: path, line: lineAt(text, match.start), name: match.group(1)!),
 ];
 
-/// The calls of [text] that reach the machine, or none where [text] does not carry the elevation
-/// field.
+/// The calls of [text] an elevation stands over, or none where no elevation stands anywhere in it.
 ///
-/// A file without the field owes elevation to no call, so its calls are not judged and not counted.
-/// Each call is read to its closing bracket by counting brackets, and the elevation is looked for
-/// only among the call's own arguments — never inside a nested call's.
+/// A call no elevation reaches owes it to nobody, so it is not judged and not counted. Each call is
+/// read to its closing bracket by counting brackets, and the elevation is looked for only among the
+/// call's own arguments — never inside a nested call's.
 List<PortCall> portCallsIn(String text, String path) {
-  if (!text.contains(elevationField)) {
+  final List<_ElevationScope> scopes = _elevationScopesIn(text);
+  if (scopes.isEmpty) {
     return const <PortCall>[];
   }
   return <PortCall>[
     for (final RegExpMatch match in _filesPortCall.allMatches(text))
-      _callAt(text, path, match, port: Port.files, method: match.group(1)!),
+      if (_covered(scopes, match.start))
+        _callAt(text, path, match, port: Port.files, method: match.group(1)!),
     for (final RegExpMatch match in _commandComposed.allMatches(text))
-      _callAt(text, path, match, port: Port.shell, method: 'Command${match.group(1) ?? ''}'),
+      if (_covered(scopes, match.start))
+        _callAt(text, path, match, port: Port.shell, method: 'Command${match.group(1) ?? ''}'),
   ];
 }
+
+/// A region of a file an elevation stands over, so a call inside it has one to pass on.
+final class _ElevationScope {
+  /// Records the region from [start] to [end], the second being the offset just past it.
+  const _ElevationScope({required this.start, required this.end});
+
+  /// The offset the region begins at.
+  final int start;
+
+  /// The offset just past the region's last character.
+  final int end;
+
+  /// Whether [offset] sits inside this region.
+  bool covers(int offset) => offset >= start && offset < end;
+}
+
+/// The regions of [text] an elevation stands over.
+///
+/// A file that writes the elevation FIELD is one region, the whole of it: the field belongs to the
+/// step, and every call the file makes is a call of that step. A file that carries the elevation in
+/// a PARAMETER gets one region per such function — the function's own body — because the value
+/// exists only there, and a function written beside it has none to pass. A function that declares
+/// the parameter and carries no body at all is no region: an interface method and a redirecting
+/// constructor make no call.
+List<_ElevationScope> _elevationScopesIn(String text) {
+  if (text.contains(elevationField)) {
+    return <_ElevationScope>[_ElevationScope(start: 0, end: text.length)];
+  }
+  return <_ElevationScope>[
+    for (int i = 0; i < text.length; i++)
+      if (text[i] == '(' && _elevationParameter.hasMatch(_ownArgumentsOf(text, i)))
+        if (_bodyAfter(text, i) case final _ElevationScope body) body,
+  ];
+}
+
+/// Whether any of [scopes] stands over [offset].
+bool _covered(List<_ElevationScope> scopes, int offset) =>
+    scopes.any((_ElevationScope scope) => scope.covers(offset));
+
+/// The body of the function whose parameter list opens at [openBracket], or null where it has none.
+///
+/// What may stand between the parameter list and the body is whitespace and the words a Dart
+/// function marks its own kind with; then the body is either a block or an arrow expression, and
+/// each is read to its own end by counting brackets. A parameter list followed by anything else
+/// belongs to a declaration that makes no call of its own — an interface method, or a constructor
+/// redirecting to another.
+_ElevationScope? _bodyAfter(String text, int openBracket) {
+  final int afterParameters = openBracket + balancedFrom(text, openBracket).length;
+  final Match? opening = _bodyOpening.matchAsPrefix(text, afterParameters);
+  if (opening == null) {
+    return null;
+  }
+  final int start = opening.end - opening.group(1)!.length;
+  return _ElevationScope(
+    start: start,
+    end: opening.group(1) == '{' ? _endOfBlock(text, start) : _endOfExpression(text, start),
+  );
+}
+
+/// The offset just past the block that opens at [openBrace].
+int _endOfBlock(String text, int openBrace) {
+  int depth = 0;
+  for (int i = openBrace; i < text.length; i++) {
+    if (text[i] == '{') {
+      depth++;
+    } else if (text[i] == '}') {
+      depth--;
+      if (depth == 0) {
+        return i + 1;
+      }
+    }
+  }
+  return text.length;
+}
+
+/// The offset just past the arrow expression that begins at [arrow].
+///
+/// It ends at the semicolon that closes the declaration, and a semicolon inside a bracket of the
+/// expression's own — a statement of a closure it hands somewhere — belongs to that bracket.
+int _endOfExpression(String text, int arrow) {
+  int depth = 0;
+  for (int i = arrow; i < text.length; i++) {
+    final String char = text[i];
+    if (char == '(' || char == '[' || char == '{') {
+      depth++;
+    } else if (char == ')' || char == ']' || char == '}') {
+      depth--;
+    } else if (char == ';' && depth <= 0) {
+      return i + 1;
+    }
+  }
+  return text.length;
+}
+
+/// What may stand between a parameter list and the body it belongs to, with the body's own opening
+/// captured.
+final RegExp _bodyOpening = RegExp(r'\s*(?:async\*?|sync\*)?\s*(\{|=>)');
+
+/// The elevation standing in a parameter list, which is the other way a file carries it.
+///
+/// Written without `required` and without a default, so all three spellings a parameter has —
+/// `bool elevated`, `required bool elevated` and `bool elevated = false` — are the same declaration
+/// here. It is looked for only among a bracket pair's OWN arguments, so [elevationField] itself can
+/// never match it: a field stands in a class body and never inside brackets.
+final RegExp _elevationParameter = RegExp(r'(?<![\w$])bool\s+elevated(?![\w$])');
 
 /// The call [match] opens, read to its closing bracket.
 PortCall _callAt(
