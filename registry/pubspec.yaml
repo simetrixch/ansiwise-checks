@@ -8,7 +8,7 @@
 name: ansiwise_checks
 description: The audits that decide whether a plugin holds the ansiwise contract.
 publish_to: none
-version: 0.1.0
+version: 0.2.0
 
 environment:
   sdk: ^3.12.0
@@ -24,11 +24,11 @@ dependencies:
   ansiwise_core:
     git:
       url: https://github.com/simetrixch/ansiwise-core.git
-      ref: 0.1.0-alpha-20260825002440
+      ref: 0.2.0-alpha-20260825164254
   ansiwise_checks_tree:
     git:
       url: https://github.com/simetrixch/ansiwise-checks.git
-      ref: 0.1.0-alpha-20260825074134
+      ref: 0.2.0-alpha-20260825164540
       path: tree
   path: ^1.9.1
   test: ^1.31.2
