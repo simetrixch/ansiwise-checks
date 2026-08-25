@@ -15,6 +15,7 @@ library;
 export 'src/analysis.dart';
 export 'src/argument_specs.dart';
 export 'src/carried_arguments.dart';
+export 'src/dart_code.dart';
 export 'src/declared_arguments.dart';
 export 'src/declared_checks.dart';
 export 'src/dependency_pins.dart';

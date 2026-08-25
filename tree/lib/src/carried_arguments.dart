@@ -34,6 +34,15 @@
 /// runs in, widening the gate this way brought 3 more files and 6 more calls under the scan and
 /// reported none of them.
 ///
+/// **A REGION IS FOUND BY COUNTING BRACES, so it is counted over [codeOf] and never over the file
+/// as written.** A brace inside a doc comment or inside a string is not a brace of the program, and
+/// a scan that counts one gets the region wrong in both directions: too far, and it reports the
+/// function written below with nothing to pass; too short, and it stops judging while still
+/// counting the file among those it judged. The second is the worse one, because the only thing it
+/// changes on the screen is a number that now means less than it says. Where a body does not close
+/// at all, no region is claimed — a region ending at the end of the file is a guess, and this scan
+/// does not make one.
+///
 /// **BOTH PORTS, because a step reaches the machine through both and the drop looks the same on
 /// either.** Through the files port the elevation is a named argument of the call itself. Through
 /// the shell it is a field of the `Command`, so what is judged is where the command is COMPOSED —
@@ -53,21 +62,30 @@
 /// declared and never read. Between the two, a step's declarations and its reads have to agree in
 /// both directions.
 ///
-/// **What this cannot do, said plainly.** It is a text scan. The first hop sees only reads written
-/// literally as `arguments.<method>('name')`, takes any bare mention of a shared spec's identifier
-/// as a declaration wherever in the file it stands, and resolves an identifier declared outside the
-/// scanned tree only where [frameworkSharedSpecs] names it. The second hop sees only calls written
-/// literally on `context.files` and commands written literally as `Command(...)`, sees an elevation
-/// standing over a call only as the field written exactly as [elevationField] or as a parameter
-/// written exactly as `bool elevated`, and a string among a call's own arguments that says
-/// `elevated` counts as passing it. A command handed to `run` as a variable is not followed, and
-/// neither is the value itself: a helper the step hands the elevation to is judged on its own
-/// parameter, never on the call that fills it, so a caller passing the wrong answer is a thing this
-/// scan cannot see. It is a good sample rather than a proof, and both of the failures above are
-/// exactly the shape it catches.
+/// **What this cannot do, said plainly.** It is a text scan.
+///
+/// The first hop reads the file AS WRITTEN, comments included: it sees only reads written literally
+/// as `arguments.<method>('name')`, takes any bare mention of a shared spec's identifier as a
+/// declaration wherever in the file it stands — a doc comment naming one included — and resolves an
+/// identifier declared outside the scanned tree only where [frameworkSharedSpecs] names it.
+///
+/// The second hop reads [codeOf] instead, so nothing written in a comment or inside a string is a
+/// call, a bracket or a brace to it. Within that, it sees only calls written literally on
+/// `context.files` and commands written literally as `Command(...)`, and sees an elevation standing
+/// over a call only as the field written exactly as [elevationField] or as a parameter written
+/// exactly as `bool elevated`. A command handed to `run` as a variable is not followed, and neither
+/// is the value itself: a helper the step hands the elevation to is judged on its own parameter,
+/// never on the call that fills it, so a caller passing the wrong answer is a thing this scan
+/// cannot see. `elevated` written out among a call's own arguments counts as passing it whatever it
+/// is set to, so a call that decides the question on purpose reads the same as one that carries the
+/// row's answer.
+///
+/// It is a good sample rather than a proof, and both of the failures above are exactly the shape it
+/// catches.
 library;
 
 import 'argument_specs.dart';
+import 'dart_code.dart';
 import 'finding.dart';
 import 'source_tree.dart';
 import 'word_purity.dart';
@@ -154,9 +172,12 @@ final class CarriedArguments {
   ];
 
   /// The judged files that carry the elevation, in a field or in a parameter.
+  ///
+  /// A file counts here on exactly the ground that puts a call of it under [calls], so the two
+  /// numbers are always read off the same population.
   List<String> get elevationCarriers => <String>[
     for (final String path in files)
-      if (_elevationScopesIn(tree.textOf(path) ?? '').isNotEmpty) path,
+      if (_elevationScopesIn(codeOf(tree.textOf(path) ?? '')).isNotEmpty) path,
   ];
 
   /// Every call an elevation stands over, through either port.
@@ -251,18 +272,23 @@ List<ArgumentRead> argumentReadsIn(String text, String path) => <ArgumentRead>[
 /// A call no elevation reaches owes it to nobody, so it is not judged and not counted. Each call is
 /// read to its closing bracket by counting brackets, and the elevation is looked for only among the
 /// call's own arguments — never inside a nested call's.
+///
+/// Every bracket counted here is counted over [codeOf] rather than over [text], so a brace or a
+/// bracket standing in a comment or in a string literal is none. A line in the answer of [codeOf]
+/// is the same line as in [text], which is why a finding still names the place a reader opens.
 List<PortCall> portCallsIn(String text, String path) {
-  final List<_ElevationScope> scopes = _elevationScopesIn(text);
+  final String code = codeOf(text);
+  final List<_ElevationScope> scopes = _elevationScopesIn(code);
   if (scopes.isEmpty) {
     return const <PortCall>[];
   }
   return <PortCall>[
-    for (final RegExpMatch match in _filesPortCall.allMatches(text))
+    for (final RegExpMatch match in _filesPortCall.allMatches(code))
       if (_covered(scopes, match.start))
-        _callAt(text, path, match, port: Port.files, method: match.group(1)!),
-    for (final RegExpMatch match in _commandComposed.allMatches(text))
+        _callAt(code, path, match, port: Port.files, method: match.group(1)!),
+    for (final RegExpMatch match in _commandComposed.allMatches(code))
       if (_covered(scopes, match.start))
-        _callAt(text, path, match, port: Port.shell, method: 'Command${match.group(1) ?? ''}'),
+        _callAt(code, path, match, port: Port.shell, method: 'Command${match.group(1) ?? ''}'),
   ];
 }
 
@@ -281,7 +307,8 @@ final class _ElevationScope {
   bool covers(int offset) => offset >= start && offset < end;
 }
 
-/// The regions of [text] an elevation stands over.
+/// The regions of [code] an elevation stands over, over the answer of [codeOf] rather than over a
+/// file's raw text.
 ///
 /// A file that writes the elevation FIELD is one region, the whole of it: the field belongs to the
 /// step, and every call the file makes is a call of that step. A file that carries the elevation in
@@ -289,14 +316,20 @@ final class _ElevationScope {
 /// exists only there, and a function written beside it has none to pass. A function that declares
 /// the parameter and carries no body at all is no region: an interface method and a redirecting
 /// constructor make no call.
-List<_ElevationScope> _elevationScopesIn(String text) {
-  if (text.contains(elevationField)) {
-    return <_ElevationScope>[_ElevationScope(start: 0, end: text.length)];
+///
+/// **A region whose end is not in the file is not a region.** Where the body does not close, the
+/// scan does not know where the elevation stops, and a region running to the end of the file would
+/// put every call written below it under an elevation that ended somewhere above. So nothing is
+/// claimed, and the function contributes neither a call to judge nor a reason to count its file
+/// among the carriers.
+List<_ElevationScope> _elevationScopesIn(String code) {
+  if (code.contains(elevationField)) {
+    return <_ElevationScope>[_ElevationScope(start: 0, end: code.length)];
   }
   return <_ElevationScope>[
-    for (int i = 0; i < text.length; i++)
-      if (text[i] == '(' && _elevationParameter.hasMatch(_ownArgumentsOf(text, i)))
-        if (_bodyAfter(text, i) case final _ElevationScope body) body,
+    for (final RegExpMatch match in _elevationParameter.allMatches(code))
+      if (_enclosingBracket(code, match.start) case final int openBracket)
+        if (_bodyAfter(code, openBracket) case final _ElevationScope body) body,
   ];
 }
 
@@ -304,50 +337,137 @@ List<_ElevationScope> _elevationScopesIn(String text) {
 bool _covered(List<_ElevationScope> scopes, int offset) =>
     scopes.any((_ElevationScope scope) => scope.covers(offset));
 
-/// The body of the function whose parameter list opens at [openBracket], or null where it has none.
+/// The bracket whose OWN arguments [offset] stands among, or null where it stands in none.
 ///
-/// What may stand between the parameter list and the body is whitespace and the words a Dart
-/// function marks its own kind with; then the body is either a block or an arrow expression, and
-/// each is read to its own end by counting brackets. A parameter list followed by anything else
-/// belongs to a declaration that makes no call of its own — an interface method, or a constructor
-/// redirecting to another.
-_ElevationScope? _bodyAfter(String text, int openBracket) {
-  final int afterParameters = openBracket + balancedFrom(text, openBracket).length;
-  final Match? opening = _bodyOpening.matchAsPrefix(text, afterParameters);
+/// Read backwards, so a nested bracket pair closes before it opens and the walk steps over it
+/// whole. That is the same "own arguments" [_ownArgumentsOf] reads forwards, and it is what keeps
+/// a `bool elevated` written as a local or as a field from being taken for a parameter: nothing
+/// encloses it, so the walk reaches the start of the file and answers null.
+int? _enclosingBracket(String code, int offset) {
+  int depth = 0;
+  for (int i = offset - 1; i >= 0; i--) {
+    final String char = code[i];
+    if (char == ')') {
+      depth++;
+    } else if (char == '(') {
+      if (depth == 0) {
+        return i;
+      }
+      depth--;
+    }
+  }
+  return null;
+}
+
+/// The body of the function whose parameter list opens at [openBracket], or null where it has none
+/// or where its end is not in [code].
+///
+/// What may stand between the parameter list and the body is whitespace, the words a Dart function
+/// marks its own kind with, and a constructor's initializer list; then the body is either a block
+/// or an arrow expression, and each is read to its own end by counting brackets. A parameter list
+/// followed by anything else belongs to a declaration that makes no call of its own — an interface
+/// method, or a constructor redirecting to another.
+_ElevationScope? _bodyAfter(String code, int openBracket) {
+  final int afterParameters = openBracket + balancedFrom(code, openBracket).length;
+  final int? opening = _bodyOpeningAfter(code, afterParameters);
   if (opening == null) {
     return null;
   }
-  final int start = opening.end - opening.group(1)!.length;
-  return _ElevationScope(
-    start: start,
-    end: opening.group(1) == '{' ? _endOfBlock(text, start) : _endOfExpression(text, start),
-  );
+  final int? end = code.startsWith('{', opening)
+      ? _endOfBlock(code, opening)
+      : _endOfExpression(code, opening);
+  return end == null ? null : _ElevationScope(start: opening, end: end);
 }
 
-/// The offset just past the block that opens at [openBrace].
-int _endOfBlock(String text, int openBrace) {
+/// The offset the body opens at, reading from [from] — just past a parameter list — or null where
+/// the declaration has no body.
+int? _bodyOpeningAfter(String code, int from) {
+  final int at = _bodyMarkers.matchAsPrefix(code, from)?.end ?? from;
+  if (code.startsWith(':', at)) {
+    return _bodyAfterInitializers(code, at + 1);
+  }
+  if (code.startsWith('{', at) || code.startsWith('=>', at)) {
+    return at;
+  }
+  return null;
+}
+
+/// The offset the body opens at, for a constructor whose initializer list begins at [from], or
+/// null where it has none.
+///
+/// The list is read with bracket depth, so an argument list or an index written inside it is
+/// stepped over whole. A brace at depth zero is either a collection literal an initializer is
+/// given or the body itself, and WHAT FOLLOWS ITS MATCH tells the two apart: after a literal the
+/// list goes on — with a comma, an operator, or the `;` of a constructor that has no body — and
+/// after the body nothing of the declaration is left. The preceding token cannot decide it,
+/// because `const {…}` and `<String, String>{…}` end in different kinds of token and are both
+/// literals.
+int? _bodyAfterInitializers(String code, int from) {
   int depth = 0;
-  for (int i = openBrace; i < text.length; i++) {
-    if (text[i] == '{') {
+  for (int i = from; i < code.length; i++) {
+    final String char = code[i];
+    if (char == '(' || char == '[') {
       depth++;
-    } else if (text[i] == '}') {
+    } else if (char == ')' || char == ']') {
+      depth--;
+    } else if (depth > 0) {
+      continue;
+    } else if (char == ';') {
+      return null;
+    } else if (char == '{') {
+      final int? close = _endOfBlock(code, i);
+      if (close == null) {
+        return null;
+      }
+      final int next = _pastWhitespace(code, close);
+      if (next >= code.length) {
+        return i;
+      }
+      if (code[next] == '{') {
+        return next;
+      }
+      if (!_initializerGoesOn.contains(code[next])) {
+        return i;
+      }
+      i = next - 1;
+    }
+  }
+  return null;
+}
+
+/// The offset of the first character from [from] that is not whitespace, or the end of [code].
+int _pastWhitespace(String code, int from) {
+  int at = from;
+  while (at < code.length && _whitespace.hasMatch(code[at])) {
+    at++;
+  }
+  return at;
+}
+
+/// The offset just past the block that opens at [openBrace], or null where it does not close.
+int? _endOfBlock(String code, int openBrace) {
+  int depth = 0;
+  for (int i = openBrace; i < code.length; i++) {
+    if (code[i] == '{') {
+      depth++;
+    } else if (code[i] == '}') {
       depth--;
       if (depth == 0) {
         return i + 1;
       }
     }
   }
-  return text.length;
+  return null;
 }
 
-/// The offset just past the arrow expression that begins at [arrow].
+/// The offset just past the arrow expression that begins at [arrow], or null where it does not end.
 ///
 /// It ends at the semicolon that closes the declaration, and a semicolon inside a bracket of the
 /// expression's own — a statement of a closure it hands somewhere — belongs to that bracket.
-int _endOfExpression(String text, int arrow) {
+int? _endOfExpression(String code, int arrow) {
   int depth = 0;
-  for (int i = arrow; i < text.length; i++) {
-    final String char = text[i];
+  for (int i = arrow; i < code.length; i++) {
+    final String char = code[i];
     if (char == '(' || char == '[' || char == '{') {
       depth++;
     } else if (char == ')' || char == ']' || char == '}') {
@@ -356,34 +476,63 @@ int _endOfExpression(String text, int arrow) {
       return i + 1;
     }
   }
-  return text.length;
+  return null;
 }
 
-/// What may stand between a parameter list and the body it belongs to, with the body's own opening
-/// captured.
-final RegExp _bodyOpening = RegExp(r'\s*(?:async\*?|sync\*)?\s*(\{|=>)');
+/// What may stand between a parameter list and the body it belongs to, before an initializer list
+/// or the body's own opening.
+final RegExp _bodyMarkers = RegExp(r'\s*(?:async\*?|sync\*)?\s*');
+
+/// One whitespace character.
+final RegExp _whitespace = RegExp(r'\s');
+
+/// What an initializer list goes on with after a collection literal one of its entries is given.
+///
+/// A comma or an operator continues the list, and `;` closes a constructor that has no body. A
+/// body is followed by none of them: whatever stands after it belongs to the next declaration.
+const Set<String> _initializerGoesOn = <String>{
+  ',',
+  '.',
+  ';',
+  '?',
+  ':',
+  '+',
+  '-',
+  '*',
+  '/',
+  '%',
+  '=',
+  '!',
+  '<',
+  '>',
+  '&',
+  '|',
+  '^',
+  '~',
+};
 
 /// The elevation standing in a parameter list, which is the other way a file carries it.
 ///
 /// Written without `required` and without a default, so all three spellings a parameter has —
 /// `bool elevated`, `required bool elevated` and `bool elevated = false` — are the same declaration
-/// here. It is looked for only among a bracket pair's OWN arguments, so [elevationField] itself can
-/// never match it: a field stands in a class body and never inside brackets.
+/// here. A match counts only where a bracket pair encloses it as one of its OWN arguments, so
+/// [elevationField] itself can never be one: a field stands in a class body and never inside
+/// brackets.
 final RegExp _elevationParameter = RegExp(r'(?<![\w$])bool\s+elevated(?![\w$])');
 
-/// The call [match] opens, read to its closing bracket.
+/// The call [match] opens in [code], read to its closing bracket.
 PortCall _callAt(
-  String text,
+  String code,
   String path,
   RegExpMatch match, {
   required Port port,
   required String method,
 }) => PortCall(
   path: path,
-  line: lineAt(text, match.start),
+  line: lineAt(code, match.start),
   port: port,
   method: method,
-  carriesElevation: _elevatedWord.hasMatch(_ownArgumentsOf(text, match.end - 1)),
+  carriesElevation: _elevatedWord.hasMatch(_ownArgumentsOf(code, match.end - 1)),
 );
 
 /// A read on the framework's argument surface, longest method name first so none shadows another.
@@ -410,11 +559,16 @@ final RegExp _elevatedWord = RegExp(r'(?<![\w$])elevated(?![\w$])');
 /// This is where a passed elevation lives: `elevated: elevated` among the call's own arguments.
 /// The same word inside a nested call belongs to that call, and keeping it out is what makes an
 /// outer call that drops the elevation reportable beside an inner one that does not.
-String _ownArgumentsOf(String text, int openBracket) {
+///
+/// [code] is the answer of [codeOf] and not a file's raw text. A bracket inside a string argument —
+/// a shell fragment such as `'echo )'` — would otherwise end the call early and hide the elevation
+/// standing after it, and its mirror `'echo ('` would carry the region into the NEXT call and take
+/// that call's elevation for this one's.
+String _ownArgumentsOf(String code, int openBracket) {
   final StringBuffer own = StringBuffer();
   int depth = 1;
-  for (int i = openBracket + 1; i < text.length; i++) {
-    final String char = text[i];
+  for (int i = openBracket + 1; i < code.length; i++) {
+    final String char = code[i];
     if (char == '(') {
       depth++;
       continue;
