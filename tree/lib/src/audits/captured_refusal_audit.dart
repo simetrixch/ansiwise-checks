@@ -384,6 +384,94 @@ final class HelmRepository extends ReversibleStep<String?> {
       expect(judged.instructions.single.undoActs, isFalse);
     });
 
+    // A BRANCH REACHES A PORT THROUGH THE CONTEXT OR THROUGH A DECLARATION OF THE SAME CLASS, and
+    // the pair below is what holds the second half honest in both directions. Counting the call
+    // reported the treatment; dropping it passes over an undo that removes the object one hop away.
+    test('A BRANCH THAT NAMES THE FILE IT LEAVES ALONE REACHES NO PORT, and is green', () {
+      // file_from_vault's own idiom, on a reading whose `ok` this rule can see. The capture answers
+      // the half that leaves the file where it is and says out loud that it is not a measurement;
+      // the undo writes down WHICH file it is leaving and returns. `fileFor` is a declaration of
+      // the same class and reads nothing but this step's own path, so the branch touches no port —
+      // and reporting it would put a finding on the code the finding tells a reader to write.
+      const String planted = '''
+final class FileFromVault extends ReversibleStep<bool> {
+  @override
+  Future<bool> capture(StepContext context) async {
+    final CommandResult found = await context.shell.run(
+      Command.observing('vault', arguments: <String>['kv', 'get', entry]),
+    );
+    if (!found.ok) {
+      context.log.warn(
+        'whether \${fileFor(context)} was already there could not be read, so an undo will leave '
+        'it alone rather than delete a file this run may not have written',
+      );
+      return true;
+    }
+    return found.stdout.isNotEmpty;
+  }
+
+  @override
+  Future<void> undo(StepContext context, bool captured) async {
+    if (captured) {
+      context.log.info('leaving \${fileFor(context)} alone: this run did not write it');
+      return;
+    }
+    await context.files.delete(fileFor(context), elevated: elevated);
+  }
+
+  String fileFor(StepContext context) => layout.runAnswerFilled(context, filePath);
+}
+''';
+
+      final ({List<Capture> captures, List<Instruction> instructions, List<Finding> findings})
+      judged = CapturedRefusal.judgementOf(planted, 'lib/file_from_vault.dart');
+
+      expect(judged.findings, isEmpty);
+      expect(judged.instructions, hasLength(1));
+      expect(judged.instructions.single.undoActs, isFalse);
+    });
+
+    test('THE PLANTED DEFECT: a port the branch reaches through a helper of the same class is '
+        'still the undo acting, and is reported', () {
+      // What the following of the call is FOR. The delete stands one hop away, in a declaration the
+      // branch calls, and a rule reading the branch's own text alone is green on a step that
+      // removes the namespace anyway. This is the probe the clause above has to keep passing: drop
+      // the following and this text stops being reported.
+      const String planted = '''
+final class KubernetesNamespace extends ReversibleStep<bool> {
+  @override
+  Future<bool> capture(StepContext context) async {
+    final CommandResult found = await context.shell.run(
+      kubectl.observing(<String>['get', 'namespace', namespace, '-o', 'name']),
+    );
+    return found.ok;
+  }
+
+  @override
+  Future<void> undo(StepContext context, bool captured) async {
+    if (captured) {
+      return;
+    }
+    await _remove(context);
+  }
+
+  Future<void> _remove(StepContext context) async {
+    await context.shell.run(
+      kubectl.command(<String>['delete', 'namespace', namespace, '--ignore-not-found']),
+    );
+  }
+}
+''';
+
+      final List<Finding> found = CapturedRefusal.findingsIn(
+        planted,
+        'lib/kubernetes_namespace.dart',
+      );
+
+      expect(found, hasLength(1));
+      expect(found.single.line, 7);
+    });
+
     test('WHAT THE UNDO DOES BEFORE IT LOOKS AT THE VALUE IS NOT THE VALUE\'S DOING', () {
       // git_merge_ref. The abort runs whatever the capture answered, so it carries no refusal — it
       // is the step cleaning up its own partial apply. A scan asking only "can this undo touch the

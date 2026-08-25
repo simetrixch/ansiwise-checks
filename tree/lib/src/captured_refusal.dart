@@ -32,6 +32,13 @@
 /// selects, and there two answers end the walk: a branch that reaches one of the three ports ACTS,
 /// and a branch that returns without reaching one leaves the machine alone.
 ///
+/// **A branch reaches a port through the undo's own context or through a declaration of the same
+/// class, and the CALL IS FOLLOWED into that declaration's body rather than counted as a reach of
+/// its own.** Counting it was a finding on the house treatment itself: the branch that leaves the
+/// machine as it stands says so in a log line, and the log line composes the path with a helper of
+/// the same class. A helper that reads an answer touches no port, and a branch touching none of the
+/// three changes nothing, whatever else it writes.
+///
 /// **A refusal is the same thing both rules recognise, read from one place.** The types a reading
 /// arrives in, what counts as a bare answer, and how a branch tests whether a reading was taken all
 /// come from the sibling rule's own file. Two scans with private copies of that would agree on the
@@ -642,25 +649,67 @@ _Branch? _branchAt(String code, int at) {
   );
 }
 
-/// Whether [region] reaches one of [portNames] through [given], or calls a declaration of the same
-/// class, which may reach one in its turn.
-bool _acts(String code, CodeRegion region, String given, List<DartDeclaration> own) {
+/// Whether [region] reaches one of [portNames] through [given], directly or through a declaration
+/// of the same class whose own body reaches one.
+///
+/// THE CALL IS FOLLOWED RATHER THAN COUNTED, and answering on the call alone reported the very
+/// treatment the finding prescribes: `fileFor`, `pathFor` — the idiom this tree writes a step's own
+/// path with — reach no port, and a log line naming the file a branch is LEAVING ALONE is written
+/// with one.
+bool _acts(String code, CodeRegion region, String given, List<DartDeclaration> own) =>
+    _reachesPort(code, region, <String>[given], own, <String>{undoName});
+
+/// Whether [region] reaches a port through one of [receivers], or through a declaration of [own] it
+/// calls that has not been [entered] yet.
+///
+/// A helper is read with ITS OWN parameter names in hand, because whatever it reaches a port
+/// through is what that declaration binds the context to, and the name the caller used says nothing
+/// about it. A QUALIFIED call is not one of these: it names a declaration of something else, and
+/// following it here would follow a name that means something else in this file. A declaration is
+/// entered once — its body reaches the same ports whichever call arrived at it, and a name that
+/// reaches itself would otherwise never end.
+bool _reachesPort(
+  String code,
+  CodeRegion region,
+  List<String> receivers,
+  List<DartDeclaration> own,
+  Set<String> entered,
+) {
   final String inside = code.substring(region.start, region.end);
-  if (RegExp(
-    '(?<![\\w\$])${RegExp.escape(given)}\\s*\\.\\s*(?:${portNames.join('|')})(?![\\w\$])',
-  ).hasMatch(inside)) {
-    return true;
+  for (final String receiver in receivers) {
+    if (_portThrough(receiver).hasMatch(inside)) {
+      return true;
+    }
   }
   for (final DartDeclaration declaration in own) {
-    if (declaration.name == undoName) {
+    if (entered.contains(declaration.name)) {
       continue;
     }
-    if (RegExp('(?<![\\w\$])${RegExp.escape(declaration.name)}\\s*\\(').hasMatch(inside)) {
+    if (!_callOf(declaration.name).hasMatch(inside)) {
+      continue;
+    }
+    entered.add(declaration.name);
+    if (_reachesPort(
+      code,
+      declaration.body,
+      _parameterNames(code, declaration.parameters),
+      own,
+      entered,
+    )) {
       return true;
     }
   }
   return false;
 }
+
+/// A reach into one of [portNames] through [receiver].
+RegExp _portThrough(String receiver) => RegExp(
+  '(?<![\\w\$])${RegExp.escape(receiver)}\\s*\\.\\s*(?:${portNames.join('|')})(?![\\w\$])',
+);
+
+/// A call of [name] that nothing stands in front of, which is the only shape a declaration of the
+/// same class is reached by.
+RegExp _callOf(String name) => RegExp('(?<![\\w\$.])${RegExp.escape(name)}\\s*\\(');
 
 /// Whether [region] hands control back rather than going on.
 bool _returns(String code, CodeRegion region) =>
