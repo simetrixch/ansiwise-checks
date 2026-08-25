@@ -85,6 +85,7 @@
 library;
 
 import 'argument_specs.dart';
+import 'dart_body.dart';
 import 'dart_code.dart';
 import 'finding.dart';
 import 'source_tree.dart';
@@ -278,7 +279,7 @@ List<ArgumentRead> argumentReadsIn(String text, String path) => <ArgumentRead>[
 /// is the same line as in [text], which is why a finding still names the place a reader opens.
 List<PortCall> portCallsIn(String text, String path) {
   final String code = codeOf(text);
-  final List<_ElevationScope> scopes = _elevationScopesIn(code);
+  final List<CodeRegion> scopes = _elevationScopesIn(code);
   if (scopes.isEmpty) {
     return const <PortCall>[];
   }
@@ -290,21 +291,6 @@ List<PortCall> portCallsIn(String text, String path) {
       if (_covered(scopes, match.start))
         _callAt(code, path, match, port: Port.shell, method: 'Command${match.group(1) ?? ''}'),
   ];
-}
-
-/// A region of a file an elevation stands over, so a call inside it has one to pass on.
-final class _ElevationScope {
-  /// Records the region from [start] to [end], the second being the offset just past it.
-  const _ElevationScope({required this.start, required this.end});
-
-  /// The offset the region begins at.
-  final int start;
-
-  /// The offset just past the region's last character.
-  final int end;
-
-  /// Whether [offset] sits inside this region.
-  bool covers(int offset) => offset >= start && offset < end;
 }
 
 /// The regions of [code] an elevation stands over, over the answer of [codeOf] rather than over a
@@ -322,194 +308,20 @@ final class _ElevationScope {
 /// put every call written below it under an elevation that ended somewhere above. So nothing is
 /// claimed, and the function contributes neither a call to judge nor a reason to count its file
 /// among the carriers.
-List<_ElevationScope> _elevationScopesIn(String code) {
+List<CodeRegion> _elevationScopesIn(String code) {
   if (code.contains(elevationField)) {
-    return <_ElevationScope>[_ElevationScope(start: 0, end: code.length)];
+    return <CodeRegion>[CodeRegion(start: 0, end: code.length)];
   }
-  return <_ElevationScope>[
+  return <CodeRegion>[
     for (final RegExpMatch match in _elevationParameter.allMatches(code))
-      if (_enclosingBracket(code, match.start) case final int openBracket)
-        if (_bodyAfter(code, openBracket) case final _ElevationScope body) body,
+      if (enclosingBracket(code, match.start) case final int openBracket)
+        if (bodyAfter(code, openBracket) case final CodeRegion body) body,
   ];
 }
 
 /// Whether any of [scopes] stands over [offset].
-bool _covered(List<_ElevationScope> scopes, int offset) =>
-    scopes.any((_ElevationScope scope) => scope.covers(offset));
-
-/// The bracket whose OWN arguments [offset] stands among, or null where it stands in none.
-///
-/// Read backwards, so a nested bracket pair closes before it opens and the walk steps over it
-/// whole. That is the same "own arguments" [_ownArgumentsOf] reads forwards, and it is what keeps
-/// a `bool elevated` written as a local or as a field from being taken for a parameter: nothing
-/// encloses it, so the walk reaches the start of the file and answers null.
-int? _enclosingBracket(String code, int offset) {
-  int depth = 0;
-  for (int i = offset - 1; i >= 0; i--) {
-    final String char = code[i];
-    if (char == ')') {
-      depth++;
-    } else if (char == '(') {
-      if (depth == 0) {
-        return i;
-      }
-      depth--;
-    }
-  }
-  return null;
-}
-
-/// The body of the function whose parameter list opens at [openBracket], or null where it has none
-/// or where its end is not in [code].
-///
-/// What may stand between the parameter list and the body is whitespace, the words a Dart function
-/// marks its own kind with, and a constructor's initializer list; then the body is either a block
-/// or an arrow expression, and each is read to its own end by counting brackets. A parameter list
-/// followed by anything else belongs to a declaration that makes no call of its own — an interface
-/// method, or a constructor redirecting to another.
-_ElevationScope? _bodyAfter(String code, int openBracket) {
-  final int afterParameters = openBracket + balancedFrom(code, openBracket).length;
-  final int? opening = _bodyOpeningAfter(code, afterParameters);
-  if (opening == null) {
-    return null;
-  }
-  final int? end = code.startsWith('{', opening)
-      ? _endOfBlock(code, opening)
-      : _endOfExpression(code, opening);
-  return end == null ? null : _ElevationScope(start: opening, end: end);
-}
-
-/// The offset the body opens at, reading from [from] — just past a parameter list — or null where
-/// the declaration has no body.
-int? _bodyOpeningAfter(String code, int from) {
-  final int at = _bodyMarkers.matchAsPrefix(code, from)?.end ?? from;
-  if (code.startsWith(':', at)) {
-    return _bodyAfterInitializers(code, at + 1);
-  }
-  if (code.startsWith('{', at) || code.startsWith('=>', at)) {
-    return at;
-  }
-  return null;
-}
-
-/// The offset the body opens at, for a constructor whose initializer list begins at [from], or
-/// null where it has none.
-///
-/// The list is read with bracket depth, so an argument list or an index written inside it is
-/// stepped over whole. A brace at depth zero is either a collection literal an initializer is
-/// given or the body itself, and WHAT FOLLOWS ITS MATCH tells the two apart: after a literal the
-/// list goes on — with a comma, an operator, or the `;` of a constructor that has no body — and
-/// after the body nothing of the declaration is left. The preceding token cannot decide it,
-/// because `const {…}` and `<String, String>{…}` end in different kinds of token and are both
-/// literals.
-int? _bodyAfterInitializers(String code, int from) {
-  int depth = 0;
-  for (int i = from; i < code.length; i++) {
-    final String char = code[i];
-    if (char == '(' || char == '[') {
-      depth++;
-    } else if (char == ')' || char == ']') {
-      depth--;
-    } else if (depth > 0) {
-      continue;
-    } else if (char == ';') {
-      return null;
-    } else if (char == '{') {
-      final int? close = _endOfBlock(code, i);
-      if (close == null) {
-        return null;
-      }
-      final int next = _pastWhitespace(code, close);
-      if (next >= code.length) {
-        return i;
-      }
-      if (code[next] == '{') {
-        return next;
-      }
-      if (!_initializerGoesOn.contains(code[next])) {
-        return i;
-      }
-      i = next - 1;
-    }
-  }
-  return null;
-}
-
-/// The offset of the first character from [from] that is not whitespace, or the end of [code].
-int _pastWhitespace(String code, int from) {
-  int at = from;
-  while (at < code.length && _whitespace.hasMatch(code[at])) {
-    at++;
-  }
-  return at;
-}
-
-/// The offset just past the block that opens at [openBrace], or null where it does not close.
-int? _endOfBlock(String code, int openBrace) {
-  int depth = 0;
-  for (int i = openBrace; i < code.length; i++) {
-    if (code[i] == '{') {
-      depth++;
-    } else if (code[i] == '}') {
-      depth--;
-      if (depth == 0) {
-        return i + 1;
-      }
-    }
-  }
-  return null;
-}
-
-/// The offset just past the arrow expression that begins at [arrow], or null where it does not end.
-///
-/// It ends at the semicolon that closes the declaration, and a semicolon inside a bracket of the
-/// expression's own — a statement of a closure it hands somewhere — belongs to that bracket.
-int? _endOfExpression(String code, int arrow) {
-  int depth = 0;
-  for (int i = arrow; i < code.length; i++) {
-    final String char = code[i];
-    if (char == '(' || char == '[' || char == '{') {
-      depth++;
-    } else if (char == ')' || char == ']' || char == '}') {
-      depth--;
-    } else if (char == ';' && depth <= 0) {
-      return i + 1;
-    }
-  }
-  return null;
-}
-
-/// What may stand between a parameter list and the body it belongs to, before an initializer list
-/// or the body's own opening.
-final RegExp _bodyMarkers = RegExp(r'\s*(?:async\*?|sync\*)?\s*');
-
-/// One whitespace character.
-final RegExp _whitespace = RegExp(r'\s');
-
-/// What an initializer list goes on with after a collection literal one of its entries is given.
-///
-/// A comma or an operator continues the list, and `;` closes a constructor that has no body. A
-/// body is followed by none of them: whatever stands after it belongs to the next declaration.
-const Set<String> _initializerGoesOn = <String>{
-  ',',
-  '.',
-  ';',
-  '?',
-  ':',
-  '+',
-  '-',
-  '*',
-  '/',
-  '%',
-  '=',
-  '!',
-  '<',
-  '>',
-  '&',
-  '|',
-  '^',
-  '~',
-};
+bool _covered(List<CodeRegion> scopes, int offset) =>
+    scopes.any((CodeRegion scope) => scope.covers(offset));
 
 /// The elevation standing in a parameter list, which is the other way a file carries it.
 ///
