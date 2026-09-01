@@ -47,6 +47,25 @@ final RegExp releaseTag = RegExp(
   r'^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-(alpha|beta|stable)-[0-9]{14}$',
 );
 
+/// The other shape a ref may take: the full name of a commit.
+///
+/// WHY A COMMIT IS ADMITTED BESIDE A TAG. What this check is for is that the tree at a ref cannot
+/// change under the caller. A tag carries that by convention — nothing stops one being moved onto
+/// another tree — while a commit carries it by construction: the name IS the content, and a
+/// different tree has a different name. So this is not a relaxation; it is the stronger of the two
+/// admitted alongside the one people read more easily.
+///
+/// WHAT IT IS FOR HERE. ansiwise-cli is the product; ansiwise-core, ansiwise-plugins and
+/// ansiwise-checks are its parts and are released by nobody, so there is no tag of theirs to name.
+/// Before this, keeping them nameable meant releasing three repositories that build nothing, and
+/// their forty-four refs drifted between those releases: measured on 2026-09-01, the twelve plugin
+/// packages stood on one commit of this repository while the cli and the core stood on another, and
+/// nothing said so.
+///
+/// FORTY HEX DIGITS, LOWER CASE, ANCHORED. An abbreviated commit is refused: it is a prefix, and a
+/// prefix can come to mean a second commit as a repository grows.
+final RegExp commitName = RegExp(r'^[0-9a-f]{40}$');
+
 /// One dependency a manifest resolves out of git.
 final class GitDependency {
   /// The dependency called [package], resolved by [manifest] at [ref], written on [line].
@@ -73,7 +92,7 @@ final class GitDependency {
   final int line;
 
   /// Whether [ref] is a release tag rather than a branch.
-  bool get isPinned => releaseTag.hasMatch(ref);
+  bool get isPinned => releaseTag.hasMatch(ref) || commitName.hasMatch(ref);
 
   @override
   String toString() => '$package at ${ref.isEmpty ? 'no ref' : ref} ($manifest:$line)';

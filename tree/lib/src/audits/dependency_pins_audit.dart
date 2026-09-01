@@ -105,6 +105,12 @@ void auditDependencyPins({SourceTree? tree}) {
       ('at_a_bare_version', 25, 'three numbers with no channel and no stamp, which no release cut'),
       ('at_no_ref', 27, 'no ref at all, which follows the default branch without naming it'),
       ('at_inline_flow', 29, 'the default branch, with the whole dependency inside braces'),
+      (
+        'at_a_short_commit',
+        38,
+        'an abbreviated commit, which is a PREFIX — and a prefix comes to mean a second commit as '
+            'a repository grows, so it names no one tree for good',
+      ),
     ]) {
       test('$dependency names $what and is reported at line $line', () {
         final Iterable<Finding> found = _about(reported, dependency);
@@ -136,6 +142,10 @@ void auditDependencyPins({SourceTree? tree}) {
 
     for (final String dependency in <String>[
       'at_a_release_tag',
+      // A COMMIT IS A PIN, and the stronger of the two: a tag can be moved onto another tree,
+      // a commit cannot, because its name IS its content. It is what a manifest names where the
+      // repository it depends on is released by nobody — which is every part of ansiwise-cli.
+      'at_a_commit',
       'at_a_path',
       'at_inline_flow_pinned',
     ]) {
@@ -231,6 +241,14 @@ dependencies:
       url: https://example.invalid/somebody/five.git
   at_inline_flow: {git: {url: https://example.invalid/somebody/six.git, ref: master}}
   at_inline_flow_pinned: {git: {url: https://example.invalid/somebody/seven.git, ref: 0.1.0-alpha-20260821194500}}
+  at_a_commit:
+    git:
+      url: https://example.invalid/somebody/eight.git
+      ref: 4f3a1c9e2b7d5086af14c3e9d2b6081fa7c45e39
+  at_a_short_commit:
+    git:
+      url: https://example.invalid/somebody/nine.git
+      ref: 4f3a1c9e2b7d
   path: ^1.9.1
 
 dev_dependencies:
