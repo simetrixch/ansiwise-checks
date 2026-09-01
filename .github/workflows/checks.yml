@@ -1,0 +1,80 @@
+# =============================================================================
+# checks — both halves of this repository are linted and tested here. Nothing is
+# built, tagged or released.
+# =============================================================================
+#
+# WHAT THIS REPOSITORY IS. The criteria every gate of this organisation judges by:
+# whether a dry run changes nothing, whether a second run changes nothing,
+# whether an undo really takes back, whether a package still declares the checks
+# it claims. It is imported from test files and from no library file at all, so
+# nothing of it ever runs on a machine — and it is a passive part of
+# ansiwise-cli, with no release of its own.
+#
+# THE TWO HALVES, AND WHY THEY ARE RUN APART. `tree` judges a source tree,
+# `registry` judges a step registry. Each carries its own manifest, and `registry`
+# names `tree` by PATH because they sit in one checkout — which is the reason the
+# pair cannot fall out of step with itself the way it once did.
+#
+# WHY IT IS JUDGED HERE AS WELL. The release loads this tree and judges it before
+# it builds anything. That is the verdict that decides; this one answers earlier,
+# on a push.
+#
+# THE SAME THING RUNS LOCALLY. build.sh and build.ps1 in the root of this
+# repository do what the job below does, in the same order.
+name: checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: both halves
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # THE PIN IS READ OUT OF THE TREE THAT HOLDS IT. This repository is where
+      # the shared gate files are mastered, but the pin a runner needs is the one
+      # a gate enforces, and ansiwise-core is the part that carries a gate. A
+      # version written out here would be a second spelling of one number.
+      - id: pin
+        name: read the pinned Dart version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(curl -fsSL \
+            https://raw.githubusercontent.com/simetrixch/ansiwise-core/master/tool/gate/pins.dart \
+            | sed -n "s/^const String dartVersion = '\(.*\)';\$/\1/p")"
+          test -n "$version" || { echo "checks: FAIL — no Dart pin could be read"; exit 1; }
+          echo "dart=$version" >> "$GITHUB_OUTPUT"
+          echo "checks: the pinned Dart is $version"
+
+      - uses: dart-lang/setup-dart@7654d458321ee25acccccfdb86cd48bd95768ff1 # v1.8.0
+        with:
+          sdk: ${{ steps.pin.outputs.dart }}
+
+      - name: analyse, format and test both halves
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+          for half in tree registry; do
+            echo "::group::$half"
+            (
+              cd "$half"
+              dart pub get
+              dart analyze --fatal-infos
+              dart format --output=none --set-exit-if-changed .
+              dart test
+            ) || failed=1
+            echo "::endgroup::"
+          done
+          test "$failed" -eq 0 || { echo "checks: FAIL — a half above is red"; exit 1; }
