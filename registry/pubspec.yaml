@@ -8,7 +8,7 @@
 name: ansiwise_checks
 description: The audits that decide whether a plugin holds the ansiwise contract.
 publish_to: none
-version: 0.7.2
+version: 0.7.3
 
 environment:
   sdk: ^3.12.0
