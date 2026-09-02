@@ -1,13 +1,13 @@
 /// refused-reading — a step never answers SATISFIED on a reading that was refused.
 ///
-/// **THE SHAPE, and it has cost this platform three outages.** A reading that COULD NOT BE TAKEN is
-/// turned into an answer. "The operating system refused me", "the tool did not answer", "the command
-/// exited non-zero" come back looking exactly like "there is nothing there", and the code reads the
-/// first as the second. One measurement folded three refused readings into the `null` that means
-/// "this machine steers nothing"; eight steps hung off it and all eight then answered Satisfied over
-/// a machine nobody had measured, including the one whose whole purpose is proving a network drop-in
-/// merged. A step that measured the host's packet-filtering backend, refused, answered "nothing to
-/// do", and half of all outbound pod traffic was lost.
+/// **THE SHAPE.** A reading that COULD NOT BE TAKEN is turned into an answer. "The operating
+/// system refused me", "the tool did not answer", "the command exited non-zero" come back looking
+/// exactly like "there is nothing there", and the code reads the first as the second. A measurement
+/// that folds a refused reading into the `null` that means "this machine steers nothing" carries
+/// every step hung off it: each one answers Satisfied over a machine nobody measured, the one whose
+/// whole purpose is proving a network drop-in merged among them. A step that measures the host's
+/// packet-filtering backend, is refused, and answers "nothing to do" loses half of all outbound pod
+/// traffic.
 ///
 /// **What is judged is the SATISFIED, not the fold.** A refusal folded into a value is not wrong by
 /// itself, and a scan saying it is would report about twenty places at once — a presence test whose

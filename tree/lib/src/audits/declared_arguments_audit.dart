@@ -47,7 +47,7 @@ void auditDeclaredArguments({required List<String> scannedPaths, SourceTree? tre
   });
 
   group('counter-probe', () {
-    // THE TWO SHAPES THIS CATCHES, both of which happened in one day.
+    // THE TWO SHAPES THIS CATCHES.
     test('an argument declared and never read is reported', () {
       const String planted = '''
 final class Subject {
@@ -66,8 +66,8 @@ final class Subject {
     });
 
     test('an argument declared under one name and read under another is reported', () {
-      // The exact shape found on 2026-08-17: the plural declared, the singular read. The argument
-      // check passed, because the name WAS declared, and nothing ever looked it up.
+      // The exact shape this catches: the plural declared, the singular read. The argument check
+      // passes, because the name IS declared, and nothing ever looks it up.
       const String planted = '''
 final class Subject {
   factory Subject.fromArguments(Arguments arguments) =>
@@ -196,10 +196,10 @@ final class Subject {
     // THE THIRD SHAPE: a declaration written as an identifier, which carries no name in the file
     // that makes it.
     test('a step that LISTS the shared elevation and never reads it is reported', () {
-      // The exact shape found on 2026-08-24. The list declares the argument, so the resolver
-      // delivered the program-wide `elevated: true` to this step on every run; the factory never
-      // read it, so the field stayed false and the command went out as the account the run started
-      // as. Nothing refused anything, and the step's own suite passed.
+      // The exact shape this catches. The list declares the argument, so the resolver delivers the
+      // program-wide `elevated: true` to this step on every run; the factory never reads it, so the
+      // field stays false and the command goes out as the account the run started as. Nothing
+      // refuses anything, and the step's own suite passes.
       const String planted = '''
 final class Subject {
   const Subject({required this.credentialsCommand, this.elevated = false});

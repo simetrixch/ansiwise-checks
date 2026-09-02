@@ -100,10 +100,9 @@ final class Subject {
     });
 
     test('a different argument whose constant merely ends the same is no declaration', () {
-      // The exact shape found on 2026-08-17, eight times: the list carries the CLASS's own
-      // elevation spec, which declares a different name, and only a substring comparison would
-      // read it as a declaration of "elevated". Qualified, the identifier names that class's
-      // constant and nothing else.
+      // The exact shape this catches: the list carries the CLASS's own elevation spec, which
+      // declares a different name, and only a substring comparison would read it as a declaration
+      // of "elevated". Qualified, the identifier names that class's constant and nothing else.
       const String planted = '''
 final class Subject {
   factory Subject.fromArguments(Arguments arguments) => Subject(
@@ -253,9 +252,9 @@ final class Subject {
 
     // THE SECOND HOP: a carried elevation dropped at one files-port call.
     test('a call over several lines with brackets in its arguments is read whole and reported', () {
-      // The exact shape found on 2026-08-17, four times: the call the row is obviously about
-      // carried the elevation, and one written beside it did not. A pattern per line cannot read
-      // this — the call's own closing bracket is lines away, behind brackets of its arguments.
+      // The exact shape this catches: the call the row is obviously about carries the elevation,
+      // and one written beside it does not. A pattern per line cannot read this — the call's own
+      // closing bracket is lines away, behind brackets of its arguments.
       const String planted = '''
 final class Subject {
   const Subject({required this.elevated});
@@ -332,12 +331,12 @@ final class Subject {
     });
 
     // THE SECOND HOP THROUGH THE OTHER PORT: a carried elevation dropped where a command is
-    // composed. The files port was the only one judged for as long as this scan existed.
+    // composed.
     test('a command composed without the elevation the file carries is reported', () {
-      // The exact shape found on 2026-08-24: the step asked the cluster for its credentials as the
-      // account the run started as, on a machine that had put that account into the group granting
-      // access one step earlier. Supplementary groups are read once, when a session starts, so the
-      // command was refused and the same program passed on its second run.
+      // The exact shape this catches: the step asks the cluster for its credentials as the account
+      // the run started as, on a machine that put that account into the group granting access one
+      // step earlier. Supplementary groups are read once, when a session starts, so the command is
+      // refused and the same program passes on its second run.
       const String planted = '''
 final class Subject {
   const Subject({required this.credentialsCommand, this.elevated = false});
@@ -523,9 +522,9 @@ Future<String?> recordedValue(
     });
 
     test('a command composed in a function taking the elevation drops it and is reported', () {
-      // The exact residue proven blind on 2026-08-25: a command composed by a helper, in a file
-      // that carries no field, with the row's answer standing in the helper's own parameter. The
-      // scan that judged files by the field text reported nothing here.
+      // The exact residue a scan judging files by the field text alone is blind to: a command
+      // composed by a helper, in a file that carries no field, with the row's answer standing in
+      // the helper's own parameter.
       const String planted = '''
 Future<CommandResult> ask(
   StepContext context,

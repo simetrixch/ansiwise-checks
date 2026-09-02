@@ -2,8 +2,7 @@
 .dart_tool/
 
 # This package is never compiled to anything, so which versions it resolved against is not part
-# of what shipped. pubspec.lock came across with the history of the directory this repository
-# was split out of, and it goes with the split.
+# of what shipped.
 pubspec.lock
 
 # The path override that points at a framework checkout beside this one. Whoever has both writes

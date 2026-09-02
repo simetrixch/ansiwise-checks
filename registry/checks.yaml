@@ -25,11 +25,9 @@ declared-checks: test/checks/declared_checks_test.dart
 # package's checks are made of, so a product name here travels to every package that runs them
 # without any of them writing it down, and nothing outside this repository reads these files.
 tool-purity: test/checks/tool_purity_test.dart
-# THE RELEASE CHECK IS GONE, AND SO IS THE RELEASE. This repository holds the criteria every
-# gate judges by; it is a part of ansiwise-cli and is released by nobody. Its workflow built
-# nothing — it only turned a tag into a release page nothing reads, because a git dependency
-# resolves out of the TAG. What names this repository now is a commit, written by the
-# product's own release/release.sh on 2026-09-01.
+# THERE IS NO RELEASE CHECK, BECAUSE THERE IS NO RELEASE. This repository holds the criteria every
+# gate judges by; it is a part of ansiwise-cli and is released by nobody. What names it is a commit,
+# written into the product's manifest by its own release/release.sh.
 # Every dependency this package resolves out of git names a release tag and never a branch. Two are
 # judged: ansiwise_core, which whoever resolves this package resolves too, and the tree half of this
 # same repository, reached out of git so the two halves are released together and read each other

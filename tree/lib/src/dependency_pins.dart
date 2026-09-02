@@ -57,10 +57,9 @@ final RegExp releaseTag = RegExp(
 ///
 /// WHAT IT IS FOR HERE. ansiwise-cli is the product; ansiwise-core, ansiwise-plugins and
 /// ansiwise-checks are its parts and are released by nobody, so there is no tag of theirs to name.
-/// Before this, keeping them nameable meant releasing three repositories that build nothing, and
-/// their forty-four refs drifted between those releases: measured on 2026-09-01, the twelve plugin
-/// packages stood on one commit of this repository while the cli and the core stood on another, and
-/// nothing said so.
+/// Keeping them nameable by tag alone would mean releasing three repositories that build nothing,
+/// and their forty-four refs drift between such releases: the twelve plugin packages stand on one
+/// commit of this repository while the cli and the core stand on another, and nothing says so.
 ///
 /// FORTY HEX DIGITS, LOWER CASE, ANCHORED. An abbreviated commit is refused: it is a prefix, and a
 /// prefix can come to mean a second commit as a repository grows.

@@ -1,11 +1,11 @@
 /// naming — the abolished words appear in no name.
 ///
-/// WHAT WAS ABOLISHED IS A PROGRAM NAME, NOT A VERB, and this distinction is the whole check. The
-/// shell implementation this plugin replaced had `install.sh` and `setup.sh`: two programs split
-/// along a line nobody could name, which is how one of them came to do five unrelated things. The
-/// verbs for our programs are `deploy` and `onboard`, and what is deployed or onboarded is a `host`,
-/// a `branch`, a `cluster`, `gitops` or the `controller`. So the two words are forbidden where a
-/// program or a sub-command is named, and there only.
+/// WHAT IS ABOLISHED IS A PROGRAM NAME, NOT A VERB, and this distinction is the whole check.
+/// `install.sh` and `setup.sh` are two programs split along a line nobody can name, which is how one
+/// of them comes to do five unrelated things. The verbs for our programs are `deploy` and
+/// `onboard`, and what is deployed or onboarded is a `host`, a `branch`, a `cluster`, `gitops` or
+/// the `controller`. So the two words are forbidden where a program or a sub-command is named, and
+/// there only.
 ///
 /// `install` as the name of what a command DOES is not abolished and must not be reported. A step
 /// that runs `apt-get install` is called install_packages.dart because that is the word the software
@@ -76,8 +76,8 @@ final class Naming {
       }
 
       if (tree.directories.contains(path)) {
-        // A directory CALLED install or setup is the old split by another route: it collects
-        // whatever somebody decided belongs to installing, which is the grouping that had no name.
+        // A directory CALLED install or setup is that same split by another route: it collects
+        // whatever somebody decides belongs to installing, which is the grouping with no name.
         if (abolishedPrograms.contains(name)) {
           found.add(
             Finding(path, 'a directory named for the abolished program, not for what is in it'),

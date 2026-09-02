@@ -11,18 +11,18 @@
 /// over a machine nobody could read, and it does it while the engine is cleaning up after some OTHER
 /// step failed, which is the worst moment to take an access away.
 ///
-/// Three sites cost this platform exactly that, each closed by hand: a refused `id -G` answered
-/// false and false was the half that ran `gpasswd --delete`; a refused read of a remote answered
-/// false and false was the half that ran `push --delete` against a tag somebody else published; a
-/// refused `get secret` answered "this run created it" and the undo deleted a credential every
-/// workload reading it depends on.
+/// The shape costs exactly that wherever it stands: a refused `id -G` answers false and false is
+/// the half that runs `gpasswd --delete`; a refused read of a remote answers false and false is
+/// the half that runs `push --delete` against a tag somebody else published; a refused
+/// `get secret` answers "this run created it" and the undo deletes a credential every workload
+/// reading it depends on.
 ///
 /// **WHAT IS JUDGED IS THE PAIR, never the fold on its own.** A capture that folds a refusal into a
-/// value its undo LEAVES ALONE is not wrong — it is the house treatment, and it is what all three
-/// closed sites now do: answer the half that leaves the machine as it stands, and say out loud that
-/// it is not a measurement. Judging the fold alone would report those three, which is the fastest
-/// way to have a check switched off. So the rule reads the undo as well and asks one question: given
-/// the value a refusal makes this capture answer, does the undo reach a port?
+/// value its undo LEAVES ALONE is not wrong — it is the house treatment: answer the half that
+/// leaves the machine as it stands, and say out loud that it is not a measurement. Judging the fold
+/// alone would report every site that does it, which is the fastest way to have a check switched
+/// off. So the rule reads the undo as well and asks one question: given the value a refusal makes
+/// this capture answer, does the undo reach a port?
 ///
 /// **How the undo is read.** Its own body, statement by statement, with the value in hand. A
 /// statement standing before any test of the captured value runs whatever the capture answered, so

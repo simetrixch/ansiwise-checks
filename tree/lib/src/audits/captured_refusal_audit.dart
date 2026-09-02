@@ -71,9 +71,9 @@ void auditCapturedRefusal({required List<String> scannedPaths, SourceTree? tree}
   });
 
   group('counter-probe', () {
-    // THE SHAPE THAT COST A MEMBERSHIP, in the form it stood in before the sweep closed it. Two
-    // declarations from the refused command to the instruction, which is why the chain is followed
-    // at all: a scan reading only the capture's own body is green on this.
+    // THE SHAPE THAT COSTS A MEMBERSHIP. Two declarations stand between the refused command and
+    // the instruction, which is why the chain is followed at all: a scan reading only the capture's
+    // own body is green on this.
     test('THE PLANTED DEFECT: a refused reading carried into the half the undo deletes on is '
         'reported', () {
       const String planted = '''
@@ -130,8 +130,8 @@ final class AddUserToGroup extends ReversibleStep<bool> {
 
     test('THE SAME SHAPE RESTORED: the refusal answers the half that leaves the machine alone, so '
         'the tree is green', () {
-      // The fix the sweep made, word for word in its shape: a helper that says out loud that this
-      // is not a measurement and answers the other half. A call is not a bare value, so nothing
+      // The correct shape, word for word: a helper that says out loud that this is not a
+      // measurement and answers the other half. A call is not a bare value, so nothing
       // travels out of the branch, and the undo is handed the half that returns.
       const String planted = '''
 final class AddUserToGroup extends ReversibleStep<bool> {
@@ -187,7 +187,7 @@ final class AddUserToGroup extends ReversibleStep<bool> {
 
     test('an answer that IS the reading\'s own ok is the shortest way to write it, and is '
         'reported', () {
-      // The two sites the ticket recorded and the third nobody had named. There is no branch here
+      // The shortest form the shape takes, and the one nothing names. There is no branch here
       // at all: a get of a named object exits non-zero for a cluster that does not hold it and for
       // a cluster that could not be asked, and the answer is that exit code.
       const String planted = '''
@@ -545,11 +545,13 @@ final class OidcAdminsBinding extends ReversibleStep<bool> {
       expect(judged.captures, hasLength(1), reason: 'the pair is still counted as one it judged');
     });
 
-    test('A CHECK IS NOT A CAPTURE: the same fold in the step\'s own check is not this rule\'s', () {
-      // replace_regex_in_tracked_file, which the ticket listed and which folds nothing at all: its
-      // capture is empty, and the reading it makes stands in the check, where a refusal blocks. The
-      // sibling rule is what judges that half.
-      const String planted = '''
+    test(
+      'A CHECK IS NOT A CAPTURE: the same fold in the step\'s own check is not this rule\'s',
+      () {
+        // replace_regex_in_tracked_file, which folds nothing at all: its capture is empty, and the
+        // reading it makes stands in the check, where a refusal blocks. The sibling rule is what
+        // judges that half.
+        const String planted = '''
 final class ReplaceRegexInTrackedFile extends ReversibleStep<void> {
   @override
   Future<void> capture(StepContext context) async {}
@@ -574,8 +576,9 @@ final class ReplaceRegexInTrackedFile extends ReversibleStep<void> {
 }
 ''';
 
-      expect(CapturedRefusal.findingsIn(planted, 'lib/replace_regex.dart'), isEmpty);
-    });
+        expect(CapturedRefusal.findingsIn(planted, 'lib/replace_regex.dart'), isEmpty);
+      },
+    );
 
     test('A PAIR WHOSE UNDO THIS SCAN CANNOT READ IS COUNTED, NEVER PASSED OVER IN SILENCE', () {
       // The one shape that must never come back as a clean answer. The undo tests the captured

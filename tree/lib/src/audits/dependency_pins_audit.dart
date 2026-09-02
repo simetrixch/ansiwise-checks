@@ -21,9 +21,9 @@ import '../source_tree.dart';
 /// SO READ THE NUMBER IN THE TEST NAME BEFORE READING THE GREEN. A run that judged zero says
 /// nothing whatever about the tree it ran in, and the tree this audit currently runs in is one of
 /// those: `ansiwise-checks/tree` resolves nothing out of git. The dependencies this check exists
-/// for stand in the OTHER trees of the family and are counted in the ticket that pins them — and
-/// until that pinning happens there is nothing to pin to, because not one of those repositories has
-/// cut a release tag. Wiring this audit into their suites is therefore part of the act that pins
+/// for stand in the OTHER trees of the family — and until they are pinned there is nothing to pin
+/// to, because not one of those repositories has cut a release tag. Wiring this audit into their
+/// suites is therefore part of the act that pins
 /// them, not a step that can be taken first: switched on today it would refuse every one of them
 /// for a state nobody can leave.
 void auditDependencyPins({SourceTree? tree}) {

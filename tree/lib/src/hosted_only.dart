@@ -26,7 +26,7 @@
 /// framework's own check takes it. It does not read `pubspec_overrides.yaml`: that file is gitignored
 /// and names sibling checkouts, so reading it would answer one tree differently on a developer's
 /// machine and in a fresh clone — and answering differently in those two places is the defect this
-/// check was written after.
+/// check exists for.
 library;
 
 import 'dependency_pins.dart' show manifestName;

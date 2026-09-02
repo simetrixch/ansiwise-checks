@@ -1,7 +1,7 @@
 /// carried-arguments — what a row grants a step is carried all the way to the act.
 ///
-/// **The two shapes this exists for cost one real machine run each to find, and nothing reported
-/// either.** They are the two hops of the same carriage: an argument's value travels from the
+/// **The two shapes this exists for are reported by nothing else, and each shows up only on a real
+/// machine.** They are the two hops of the same carriage: an argument's value travels from the
 /// program row into the step, and from the step into every call the step makes. This scan judges
 /// both hops, because a value dropped on either one fails the same way — silently, and only on a
 /// machine.
@@ -10,29 +10,25 @@
 /// program-wide default only under a name the step's argument list declares, so in such a step
 /// `arguments.has('elevated')` answers no, the value never arrives, and the step runs as the
 /// account the run started as whatever the row says. Nothing refuses anything: the read is spelled
-/// correctly, the row is valid, and the run reports success. Ten steps had it on one day — eight of
-/// them because their list carried `Client.elevationArgument`, a DIFFERENT argument whose constant
-/// merely ends in the same identifier, and a substring comparison took it for a declaration.
+/// correctly, the row is valid, and the run reports success. The common source is a list carrying
+/// `Client.elevationArgument`, a DIFFERENT argument whose constant merely ends in the same
+/// identifier, which a substring comparison reads as a declaration.
 ///
 /// **The second hop: a file carries the elevation and one call does not pass it on.** The elevation
 /// the row granted reached the step and is dropped at the last moment: that one call acts as the
 /// operator, and a path root owns turns into a failure three steps from the reason.
 ///
-/// **A FILE CARRIES IT IN A FIELD OR IN A PARAMETER, and for a while only the field was looked at.**
-/// A step keeps the row's answer in `final bool elevated;` and hands it to a helper of its own as a
-/// parameter, and such a helper's file writes the field nowhere — so a gate on the field text alone
-/// judged no call in it at all. Six calls stood behind that gate on 2026-08-25, one of them a shell
-/// command, and every one of them was correct, which is why the hole was worth stating before it
-/// cost a run rather than after.
+/// **A FILE CARRIES IT IN A FIELD OR IN A PARAMETER, and a gate on the field alone reads only the
+/// first.** A step keeps the row's answer in `final bool elevated;` and hands it to a helper of
+/// its own as a parameter, and such a helper's file writes the field nowhere — so a gate on the
+/// field text alone judges no call in it at all.
 ///
 /// So a call is judged wherever an elevation STANDS OVER it: anywhere in a file that writes the
 /// field exactly as [elevationField], and inside the BODY of a function whose parameter list
 /// declares `bool elevated`. Scoped to that body rather than to the whole file, because a helper
 /// taking the elevation says nothing about the function written beside it — a gate on the file
 /// would report a call that has no elevation to pass, and a scan reporting calls nobody can fix is
-/// the noise that teaches people to stop reading it. Measured over the twelve packages this audit
-/// runs in, widening the gate this way brought 3 more files and 6 more calls under the scan and
-/// reported none of them.
+/// the noise that teaches people to stop reading it.
 ///
 /// **A REGION IS FOUND BY COUNTING BRACES, so it is counted over [codeOf] and never over the file
 /// as written.** A brace inside a doc comment or inside a string is not a brace of the program, and
@@ -47,11 +43,11 @@
 /// either.** Through the files port the elevation is a named argument of the call itself. Through
 /// the shell it is a field of the `Command`, so what is judged is where the command is COMPOSED —
 /// `context.shell.run` only carries what the command already says, and a scan reading `run`'s own
-/// arguments would report every step in the tree and see nothing. Four files-port calls dropped it
-/// on one day; the shell half was measured on the day `export_kubeconfig` asked a cluster for its
-/// credentials as the operator, on a machine whose account had been put into the group granting
-/// access one step earlier — supplementary groups are read once, when a session starts, so the
-/// second run of the same program passed and the first never could.
+/// arguments would report every step in the tree and see nothing. A drop on the shell side is what
+/// makes `export_kubeconfig` ask a cluster for its credentials as the operator on a machine whose
+/// account was put into the group granting access one step earlier — supplementary groups are read
+/// once, when a session starts, so the second run of the same program passes and the first never
+/// can.
 ///
 /// Such a call runs over several lines and carries brackets inside its own arguments, so it is read
 /// by counting brackets rather than by a pattern per line — and the elevation is looked for only

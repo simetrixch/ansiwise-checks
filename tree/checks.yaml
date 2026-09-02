@@ -35,15 +35,15 @@ tool-purity: test/checks/tool_purity_test.dart
 hosted-only: test/checks/hosted_only_test.dart
 
 # A reading that could not be taken never becomes a satisfied answer. A refused command comes back
-# looking exactly like "there is nothing there", and three outages were reported green by code that
-# read the first as the second. This package holds no reading of its own, so what the run proves
-# here is the scan: the counter-probes plant each shape and take it out again.
+# looking exactly like "there is nothing there", and code that reads the first as the second reports
+# an outage green. This package holds no reading of its own, so what the run proves here is the
+# scan: the counter-probes plant each shape and take it out again.
 refused-reading: test/checks/refused_reading_test.dart
 
 # A capture never answers, on a reading that was refused, a value its undo ACTS on. A capture has no
 # "more work" direction: every value it answers is an instruction to the undo, one half leaves the
 # machine as it stands and the other takes something away, and there is no third value meaning
-# nobody read this. Three sites took away a membership, a tag somebody else published and a
-# credential before this was held by anything. This package holds no capture of its own, so what the
+# nobody read this. Such a fold takes away a membership, a tag somebody else published or a
+# credential every workload depends on. This package holds no capture of its own, so what the
 # run proves here is the scan: the counter-probes plant each shape and take it out again.
 captured-refusal: test/checks/captured_refusal_test.dart

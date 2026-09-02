@@ -16,8 +16,8 @@ import '../step_under_probe.dart';
 /// while the branch every installation DOES take is measured by nothing and the step is counted as
 /// covered.
 ///
-/// That is not hypothetical: every answer used to be handed the text `x`, and a step whose answer is
-/// declared `default: ''` was reported as exercised on a value the product never gives it.
+/// That is not hypothetical: hand every answer the text `x`, and a step whose answer is declared
+/// `default: ''` reads as exercised on a value the product never gives it.
 ///
 /// So the declarations are read out of the installation's own programs, and what no program declares
 /// is NAMED rather than quietly replaced by a placeholder.

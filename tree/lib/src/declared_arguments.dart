@@ -5,11 +5,11 @@
 /// one the step declares and never reads is ACCEPTED: the argument check passes, because the name is
 /// declared, and nothing ever looks it up. The row runs, does nothing about it, and reports success.
 ///
-/// It happened twice in one day. One argument was declared as `skippable_answers` and read as
-/// `skippable_answer`, so the capability it advertised was unreachable by any row. Five more were
-/// declared, carried through every use inside the class, and never taken out of the arguments at
-/// all — so five steps ignored what their rows told them, on every machine, and two of them proved
-/// it by failing on a real one after the rest of the run had already happened.
+/// It takes two shapes. An argument declared as `skippable_answers` and read as `skippable_answer`
+/// advertises a capability no row can reach. An argument declared, carried through every use inside
+/// the class, and never taken out of the arguments at all leaves a step ignoring what its row tells
+/// it, on every machine, until it fails on a real one after the rest of the run has already
+/// happened.
 ///
 /// **A declaration is written in three ways, and the third is the one that carries no name at all.**
 /// An INLINE one sits in a step's own list and belongs to that step, so that step's file has to read
@@ -20,16 +20,16 @@
 /// is, and the resolver delivers a value under it exactly the same way — but the file holds no
 /// `name:` anywhere, so a scan reading only what is written out sees a step that declares nothing.
 ///
-/// That is what let a step declare the elevation, carry `final bool elevated;`, never read the
-/// argument, and pass every check: the field stayed false on every machine while a program-wide
-/// default said `elevated: true`, and the command it granted root for was refused by a snap. It
-/// passed on the second run of the same program, because the account had by then started a session
-/// carrying the group it had been put into.
+/// That is what lets a step declare the elevation, carry `final bool elevated;`, never read the
+/// argument, and pass every check: the field stays false on every machine while a program-wide
+/// default says `elevated: true`, and the command it grants root for is refused by a snap. The
+/// second run of the same program passes, because the account has by then started a session
+/// carrying the group it was put into.
 ///
 /// So an inline and a listed declaration are judged against their own file, and a named one against
-/// the whole scan. Judging inline and named the same way was tried and was wrong in both directions:
-/// per file it reported three shared declarations that two neighbours read correctly, and tree-wide
-/// it would let a misspelled argument pass because some other step happens to use the same word.
+/// the whole scan. Judging inline and named the same way is wrong in both directions: per file it
+/// reports three shared declarations that two neighbours read correctly, and tree-wide it lets a
+/// misspelled argument pass because some other step happens to use the same word.
 ///
 /// **What this cannot do, said plainly.** It is a text scan. A file that builds its argument name out
 /// of pieces, or reads it through a constant declared somewhere else, passes without being read —

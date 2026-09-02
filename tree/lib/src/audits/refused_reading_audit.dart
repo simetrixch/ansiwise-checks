@@ -129,9 +129,9 @@ final class MeasurePublicNic extends ObservingStep {
 
     test('THE SAME SHAPE RESTORED: the refusal throws, so nothing travels and the tree is '
         'green', () {
-      // The fix the sweep made. The engine wraps every check in one catch and turns what is thrown
-      // into a refusal naming the tool's own words, so throwing IS how a measurement says it was
-      // not taken — and it needs no branch in any of the eight steps that read the answer.
+      // The engine wraps every check in one catch and turns what is thrown into a refusal naming
+      // the tool's own words, so throwing IS how a measurement says it was not taken — and it
+      // needs no branch in any step that reads the answer.
       const String planted = '''
 final class MeasurePublicNic extends ObservingStep {
   static Future<List<_DefaultRoute>> _defaultRoutes(StepContext context) async {
@@ -201,7 +201,7 @@ final class AlignBackend extends ReversibleStep<String> {
       expect(found.single.line, 8);
     });
 
-    // THE INNOCENT NEIGHBOURS, drawn from the sweep's own taxonomy rather than invented. Without
+    // THE INNOCENT NEIGHBOURS, drawn from the tree's own shapes rather than invented. Without
     // them a scan that reported every satisfied answer in the tree would pass every probe above,
     // and a clean run would mean nothing.
     test('THE HOUSE TREATMENT: a value naming the refusal ends the chain', () {
@@ -305,7 +305,7 @@ final class RemoveVaultKvEntry extends IrreversibleStep {
     });
 
     test('FAIL-SAFE: a refusal that leads to MORE work is not a false done', () {
-      // apply_netplan, left standing by the sweep with the cost named: a refused `ip rule show`
+      // apply_netplan, which this scan leaves standing with the cost named: a refused `ip rule show`
       // means "the rule is missing", which makes the step Ready and the work happen. That costs one
       // unnecessary network apply and never a green row over a machine nobody read. This scan holds
       // the claim rather than the fold, so it is silent here on purpose — and the day somebody
@@ -473,7 +473,7 @@ final class RequireFreeDisk extends ObservingStep {
       Command.observing('df', arguments: <String>['-B1', '--output=avail', path]),
     );
     if (!measured.ok) {
-      // The old spelling of this branch read `if (measured.ok) {` and answered the other way.
+      // A branch written as `if (measured.ok) {` answers the other way.
       return CheckResult.blocked('df could not measure the path');
     }
     return const CheckResult.satisfied('there is room enough');

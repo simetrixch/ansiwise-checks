@@ -5,12 +5,11 @@
 /// `dart run tool/build.dart` compiles into the binary a Linux machine is given — so an editor or a
 /// script that writes CRLF puts a broken file in front of both without git ever seeing it.
 ///
-/// That is not a theoretical failure. It happened: two checks were patched by a Python script, which
-/// writes `\r\n` by default on Windows, and on the Linux side the kernel looked for `bash\r`, found
-/// nothing, and fell back to `sh` — where `set -o pipefail` does not exist. Both checks reported a
-/// shell error instead of a finding, which reads as a broken tree rather than a broken file. The
-/// scripts are gone; what wrote them has not changed, and a Dart file the analyzer parses with a
-/// stray carriage return on every line is the same class of surprise.
+/// That is not a theoretical failure. A shell check patched by a tool that writes `\r\n` by default
+/// on Windows makes the Linux kernel look for `bash\r`, find nothing, and fall back to `sh` — where
+/// `set -o pipefail` does not exist, so the check reports a shell error instead of a finding, which
+/// reads as a broken tree rather than a broken file. A Dart file the analyzer parses with a stray
+/// carriage return on every line is the same class of surprise.
 library;
 
 import 'package:path/path.dart' as p;
