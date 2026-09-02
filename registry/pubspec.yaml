@@ -25,11 +25,13 @@ dependencies:
     git:
       url: https://github.com/simetrixch/ansiwise-core.git
       ref: c724e1b67f4370ffa0634539bb10557d91470400
+  # THE SIBLING HALF, BY PATH AND NOT BY REF. Both halves stand in one checkout, so a path always
+  # names the tree it was fetched with. A ref here would have to name the commit this file is part
+  # of, which cannot be written before that commit exists — so it names an older one, and a
+  # consumer holding both halves is asked to resolve two different commits of one repository,
+  # which pub refuses.
   ansiwise_checks_tree:
-    git:
-      url: https://github.com/simetrixch/ansiwise-checks.git
-      ref: 0.7.4-stable-20260901191607
-      path: tree
+    path: ../tree
   path: ^1.9.1
   test: ^1.31.2
   yaml: ^3.1.3
