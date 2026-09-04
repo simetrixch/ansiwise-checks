@@ -24,7 +24,7 @@ dependencies:
   ansiwise_core:
     git:
       url: https://github.com/simetrixch/ansiwise-core.git
-      ref: f798ad9f0a51fde2622c73e04596689cfa22e705
+      ref: a11d358266c6c6b9ab9406216dd2080e8d80c2d7
   # THE SIBLING HALF, BY PATH AND NOT BY REF. Both halves stand in one checkout, so a path always
   # names the tree it was fetched with. A ref here would have to name the commit this file is part
   # of, which cannot be written before that commit exists — so it names an older one, and a
