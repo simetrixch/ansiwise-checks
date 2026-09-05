@@ -13,8 +13,8 @@
 # manifest. `registry` names `tree` by PATH — they sit in one checkout, which is
 # why the pair cannot fall out of step with itself.
 #
-# Windows twin: build.ps1 in this folder. The two are held to answering
-# identically.
+# Windows entry point: build.ps1 in this folder. It is a shim that starts
+# THIS file, so there is no second spelling of this build to keep true.
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"

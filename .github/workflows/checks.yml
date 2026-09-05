@@ -19,7 +19,7 @@
 # it builds anything. That is the verdict that decides; this one answers earlier,
 # on a push.
 #
-# THE SAME THING RUNS LOCALLY. build.sh and build.ps1 in the root of this
+# THE SAME THING RUNS LOCALLY. build.sh in the root of this
 # repository do what the job below does, in the same order.
 name: checks
 
