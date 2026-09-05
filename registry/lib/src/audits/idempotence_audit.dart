@@ -83,7 +83,7 @@ Future<void> auditIdempotence(
   test('every fixture names a step this registry holds', () {
     // A fixture keyed on a step that is no longer here is IGNORED rather than reported, so a step
     // moving to another package leaves its arrangement behind, where it reads as coverage and is
-    // none. That is how eight of them survived a package split with nothing going red.
+    // none, and nothing goes red over it.
     expect(
       fixtures.keys.where((String name) => !registry.steps.containsKey(StepName(name))),
       isEmpty,

@@ -64,8 +64,8 @@
 /// itself. `n == null`, `!n`, `n.isEmpty` and a condition that is nothing but `n` are the four
 /// tests it understands; anything else is a branch it does not know the refusal reaches.
 ///
-/// It is a good sample rather than a proof, and the measurement that cost the eight satisfied rows
-/// is exactly the shape it catches.
+/// It is a good sample rather than a proof, and the shape named at the top of this file is exactly
+/// the one it catches.
 library;
 
 import 'argument_specs.dart';

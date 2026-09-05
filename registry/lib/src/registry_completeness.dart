@@ -1,8 +1,8 @@
 /// registry-completeness — the registry and the classes on disk say the same thing.
 ///
 /// Dart compiled ahead of time has no reflection, so the map from the names a program file writes to
-/// the classes that implement them is written out by hand. That is not a workaround, it is what makes
-/// this check possible: a registry that is written is a registry that can be counted against the tree
+/// the classes that implement them is written out by hand, which is what makes this check possible:
+/// a registry that is written is a registry that can be counted against the tree
 /// in both directions. No step exists unregistered, and no entry points at a class that is gone.
 ///
 /// THE THIRD DIRECTION IS THE `source:` OF EACH ENTRY, and it is the one that rots. It is the file
@@ -244,13 +244,12 @@ final RegExp _driveLetter = RegExp(r'^[A-Za-z]:');
 
 /// How a registrable step class is declared, as one line.
 ///
-/// FOUR SHAPES, and three of them were invisible until they were counted:
+/// FOUR SHAPES, and a pattern matching only the first sees about half the tree:
 ///
-/// - `final class Foo extends IrreversibleStep {` — the one this always matched.
+/// - `final class Foo extends IrreversibleStep {` — the kind as the last word on the line.
 /// - `final class Foo extends ReversibleStep<bool> {` — the TYPE ARGUMENT. Every reversible step
-///   grew one when the framework made the captured value part of the type, and this pattern
-///   required the kind to be the last word on the line. Forty-seven of ninety-one step classes
-///   stopped being seen, the gate stayed green, and nothing said the coverage had halved.
+///   carries one, because the captured value is part of the type, so a pattern requiring the kind
+///   to be the last word on the line stops seeing them and the gate stays green over the loss.
 /// - `... extends ReversibleStep<String?> with FileStep {` — the `with` clause, same failure.
 /// - The declaration `dart format` wrapped because the name and its type argument no longer fit.
 ///   That one cannot be matched on a single line at all and is handled where this is used.

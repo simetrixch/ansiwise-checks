@@ -34,7 +34,7 @@
 ///
 /// **A branch reaches a port through the undo's own context or through a declaration of the same
 /// class, and the CALL IS FOLLOWED into that declaration's body rather than counted as a reach of
-/// its own.** Counting it was a finding on the house treatment itself: the branch that leaves the
+/// its own.** Counting it reports the house treatment itself: the branch that leaves the
 /// machine as it stands says so in a log line, and the log line composes the path with a helper of
 /// the same class. A helper that reads an answer touches no port, and a branch touching none of the
 /// three changes nothing, whatever else it writes.
