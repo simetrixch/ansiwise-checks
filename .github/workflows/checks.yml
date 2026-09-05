@@ -1,5 +1,5 @@
 # =============================================================================
-# checks — both halves of this repository are linted and tested here. Nothing is
+# checks — every half of this repository is linted and tested here. Nothing is
 # built, tagged or released.
 # =============================================================================
 #
@@ -10,10 +10,10 @@
 # nothing of it ever runs on a machine — and it is a passive part of
 # ansiwise-cli, with no release of its own.
 #
-# THE TWO HALVES, AND WHY THEY ARE RUN APART. `tree` judges a source tree,
-# `registry` judges a step registry. Each carries its own manifest, and `registry`
-# names `tree` by PATH because they sit in one checkout — which is the reason the
-# pair cannot fall out of step with itself the way it once did.
+# THE HALVES, AND WHY THEY ARE RUN APART. `tree` judges a source tree, `registry`
+# judges a step registry, `gate` runs a repository's own tools. Each carries its
+# own manifest, and the two that need `tree` name it by PATH because they sit in
+# one checkout — which is the reason they cannot fall out of step with it.
 #
 # WHY IT IS JUDGED HERE AS WELL. The release loads this tree and judges it before
 # it builds anything. That is the verdict that decides; this one answers earlier,
@@ -36,23 +36,21 @@ concurrency:
 
 jobs:
   gate:
-    name: both halves
+    name: every half
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # THE PIN IS READ OUT OF THE TREE THAT HOLDS IT. This repository is where
-      # the shared gate files are mastered, but the pin a runner needs is the one
-      # a gate enforces, and ansiwise-core is the part that carries a gate. A
-      # version written out here would be a second spelling of one number.
+      # THE PIN IS READ OUT OF THE FILE THAT HOLDS IT, and that file now stands
+      # here: gate/lib/src/pins.dart is the one place the Dart version of this
+      # family is written, and the gate refuses every other SDK naming both
+      # numbers. A version written out here would be a second spelling of it.
       - id: pin
         name: read the pinned Dart version
         shell: bash
         run: |
           set -euo pipefail
-          version="$(curl -fsSL \
-            https://raw.githubusercontent.com/simetrixch/ansiwise-core/master/tool/gate/pins.dart \
-            | sed -n "s/^const String dartVersion = '\(.*\)';\$/\1/p")"
+          version="$(sed -n "s/^const String dartVersion = '\(.*\)';\$/\1/p" gate/lib/src/pins.dart)"
           test -n "$version" || { echo "checks: FAIL — no Dart pin could be read"; exit 1; }
           echo "dart=$version" >> "$GITHUB_OUTPUT"
           echo "checks: the pinned Dart is $version"
@@ -61,12 +59,13 @@ jobs:
         with:
           sdk: ${{ steps.pin.outputs.dart }}
 
-      - name: analyse, format and test both halves
+      - name: analyse, format and test every half
         shell: bash
         run: |
           set -euo pipefail
           failed=0
-          for half in tree registry; do
+          for manifest in */pubspec.yaml; do
+            half="${manifest%/pubspec.yaml}"
             echo "::group::$half"
             (
               cd "$half"

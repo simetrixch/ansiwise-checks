@@ -1,0 +1,2 @@
+# The same rule set the framework holds itself to, so the gate is held to what it judges.
+include: package:ansiwise_checks_tree/analysis_options.yaml

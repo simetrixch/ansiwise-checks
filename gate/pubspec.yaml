@@ -1,0 +1,29 @@
+# The gate itself: the program that runs every check of a repository and answers with one verdict.
+#
+# THE THIRD HALF, AND THE ONE THAT STARTS PROCESSES. `tree` reads a tree of files and `registry`
+# drives a step registry; neither ever starts a tool. This one does nothing else — it resolves a
+# repository, asks the analyzer and the formatter about it, and runs its suites — so the port that
+# starts `dart` and the fake that stands in for it live here and nowhere else.
+#
+# IT REACHES NOTHING BUT `dart:`. Every caller resolves the package the gate sits in and THEN starts
+# it, and the first thing the gate does is resolve the rest of the tree. A dependency here is a
+# dependency of every gate in the family, resolved before any of them can run.
+name: ansiwise_checks_gate
+description: The gate that resolves a repository, judges it with the Dart toolchain, and reports one verdict.
+publish_to: none
+version: 0.7.4
+
+environment:
+  sdk: ^3.12.0
+
+dev_dependencies:
+  test: ^1.31.2
+  lints: ^6.1.0
+  # THE SIBLING HALF, BY PATH AND NOT BY REF, exactly as the registry half names it: both stand in
+  # one checkout, so a path always names the tree it was fetched with. A DEV dependency, so nothing
+  # a caller resolves reaches it — pub resolves no dev dependency of a package that is not the root
+  # — and it is here for this package's own suite: the declaration-against-disk reading and the
+  # analyzer answer about this tree are one implementation, in that half, driven by every package of
+  # the family.
+  ansiwise_checks_tree:
+    path: ../tree
