@@ -20,7 +20,7 @@
 # on a push.
 #
 # THE SAME THING RUNS LOCALLY. build.sh in the root of this repository does what
-# the job below does, in the same order, and build.ps1 beside it starts build.sh.
+# the job below does, in the same order.
 name: checks
 
 on:
