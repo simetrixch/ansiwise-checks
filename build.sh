@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-# build.sh — prove every half of this repository locally, the way
-# .github/workflows/checks.yml does.
+# build.sh — prove every half of this repository locally, the way the ci of
+# the master does.
 # =============================================================================
 #
 # THIS REPOSITORY BUILDS NOTHING. It holds the criteria every gate judges by, is
