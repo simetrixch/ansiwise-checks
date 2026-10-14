@@ -17,9 +17,6 @@
 # be edited by whoever adds a half, in a file they have no reason to open, and a
 # half left out of it is a half this run reports nothing about while saying every
 # one is green.
-#
-# Windows entry point: build.ps1 in this folder. It is a shim that starts
-# THIS file, so there is no second spelling of this build to keep true.
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"

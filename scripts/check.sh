@@ -8,9 +8,6 @@
 # not repeated here, because a second spelling of them is a second thing to keep true. This file
 # exists so that every repository of this family answers to one command name, and so the push hook
 # has one thing to call.
-#
-# Windows entry point: check.ps1 beside this file. It is a shim that starts THIS file, so there
-# is no second spelling of these checks that could answer differently.
 set -uo pipefail
 
 root="$(git rev-parse --show-toplevel)" || exit 1
