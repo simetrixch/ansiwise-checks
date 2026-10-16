@@ -18,6 +18,7 @@ library;
 /// RAISED RATHER THAN INSTALLED ALONGSIDE. Where the workstation carries a version this constant
 /// does not name, the gate cannot run there at all — and a gate that cannot run is a gate nobody
 /// uses: releases then get cut on `dart test` alone, which is a subset of what this gate asks. The
-/// build workflow takes its SDK from THIS constant, so raising it moves the machine and the build
-/// together rather than splitting them.
+/// ci installs the Dart that `ci-tools.json` names, and `gate/test/checks/ci_tools_test.dart` holds
+/// it equal to THIS constant, so raising it moves the machine and the ci together rather than
+/// splitting them.
 const String dartVersion = '3.13.4';
