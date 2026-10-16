@@ -5,7 +5,7 @@
 /// so `ansiwise-core` and `ansiwise-cli` each carried the same eleven files, five of which had
 /// drifted. What the callers actually do is resolve the package the gate sits in FIRST and start the
 /// gate second: `dart pub get`, then `dart run tool/ci.dart`, in every build script, every check
-/// script and every workflow. The resolution the gate performs is the one over every package of the
+/// script and the ci of the master. The resolution the gate performs is the one over every package of the
 /// repository, which is what the analyzer, the formatter and the suites read.
 ///
 /// **What it still may not do is grow a dependency.** This package reaches nothing but `dart:`,

@@ -7,8 +7,9 @@
 ///
 /// THE PACKAGE IS NOT THE REPOSITORY HERE, and that is why the second of the two exists. This
 /// repository holds two packages and no root package, so a program sitting in one of them has to
-/// walk up to find the tree a release is cut from — the workflow that decides which tags start one,
-/// and every manifest a release bumps, are above the package this program lives in.
+/// walk up to find the tree a release is cut from — every manifest a release bumps is above the
+/// package this program lives in. Which tags start a release is decided in hostyour-cloud, by
+/// `global.releaseTagFilter` of `clusters/platform/values-common.yaml`, not in this tree.
 library;
 
 import 'dart:io';
