@@ -13,8 +13,10 @@
 /// **The tree is found by its SHAPE, and this library names no installation.** What is searched for
 /// is the layout an installation has — [installationPrograms] below its root — and never the name of
 /// one, because a name here would be a name every package that depends on this library inherits
-/// without ever writing it down. Whoever has a tree the search does not reach, or more than one,
-/// names it in [installationVariable] and the search does not run at all.
+/// without ever writing it down. A linked git worktree of an installation is told from its clone the
+/// same way, by its shape on disk: its `.git` is a file, and the clone wins over it (see
+/// [installationFoundFrom]). Whoever has a tree the search does not reach, or more than one it cannot
+/// choose between, names it in [installationVariable] and the search does not run at all.
 ///
 /// **Absent FAILS, and the refusal says what it looked for.** A suite that quietly skipped the
 /// declarations would report green over the one thing this exists to measure, and the shape of that
@@ -94,28 +96,42 @@ String get installationRoot {
 /// walks upward from where it starts, rather than resting on one relative path that is only true at
 /// a single depth.
 ///
-/// **The nearest directory that holds an answer decides, and TWO answers decide nothing.** A search
-/// that picked one of two trees would report which programs a package agrees with without saying
-/// that it chose, and the choice would move with the order a directory happens to be listed in.
+/// **The nearest directory that holds a deciding tree decides, and TWO trees decide nothing.** A tree
+/// found one or two directories below a directory on the way up, whose `.git` is a FILE, is a linked
+/// git worktree: a branch some piece of work has checked out, which is not what the installation
+/// deploys. It does not decide at its level. The walk keeps the worktrees of the nearest level that
+/// found any and climbs on, so the clone beside them wins. Every other tree decides where it is
+/// found: one is read, two at one level are refused. The tree met as a directory on the way up
+/// itself decides whatever its `.git` is, because a suite run inside a worktree means that worktree.
+/// Only where the walk ends with no deciding tree do the kept worktrees decide, one read and two
+/// refused. A search that picked one of two trees would report which programs a package agrees with
+/// without saying that it chose, and the choice would move with the order a directory happens to be
+/// listed in.
 ///
 /// The starting directory is a PARAMETER so the search can be driven over a tree a probe planted.
 /// Reading it off the process would leave every one of the shapes below — the depths it reaches, the
 /// two answers it refuses over — measurable only against whatever checkouts a machine happens to
-/// carry, which is to say not measurable at all.
-String installationFoundFrom(Directory start) {
+/// carry, which is to say not measurable at all. Where the walk ends is one too, [upTo], in place of
+/// the root of the volume: a probe whose answer is reached at the end of the walk stops it at its own
+/// directory, so it never reads what another run planted beside it.
+String installationFoundFrom(Directory start, {Directory? upTo}) {
+  ({String level, List<String> trees})? worktrees;
   for (Directory above = start; ; above = above.parent) {
     final List<String> found = _installationsUnder(above);
-    if (found.length == 1) {
-      return found.single;
+    final List<String> deciding = <String>[
+      for (final String tree in found)
+        if (tree == above.path || !_isLinkedWorktree(tree)) tree,
+    ];
+    if (deciding.isNotEmpty) {
+      return _onlyTreeAt(above.path, deciding);
     }
-    if (found.length > 1) {
-      throw StateError(
-        '${found.length} trees at or below ${above.path} hold $installationPrograms — '
-        '${found.join(', ')} — and which of them these audits are meant to read is not something a '
-        'search can decide. Set $installationVariable to the one you mean.',
-      );
+    if (worktrees == null && found.isNotEmpty) {
+      worktrees = (level: above.path, trees: found);
     }
-    if (above.parent.path == above.path) {
+    if (above.path == upTo?.path || above.parent.path == above.path) {
+      if (worktrees != null) {
+        return _onlyTreeAt(worktrees.level, worktrees.trees);
+      }
       throw StateError(
         'no tree holding $installationPrograms was found from ${start.path} upward, searching each '
         'directory on the way and everything up to $_searchDepth directories below it — the '
@@ -126,6 +142,22 @@ String installationFoundFrom(Directory start) {
     }
   }
 }
+
+/// The one tree of [trees], found at or below [level], or the refusal that names them all.
+String _onlyTreeAt(String level, List<String> trees) {
+  if (trees.length > 1) {
+    throw StateError(
+      '${trees.length} trees at or below $level hold $installationPrograms — '
+      '${trees.join(', ')} — and which of them these audits are meant to read is not something a '
+      'search can decide. Set $installationVariable to the one you mean.',
+    );
+  }
+  return trees.single;
+}
+
+/// Whether [tree] is a linked git worktree: git writes its `.git` as a file naming the clone's git
+/// directory, where a clone's `.git` is a directory.
+bool _isLinkedWorktree(String tree) => FileSystemEntity.isFileSync('$tree/.git');
 
 /// The directory the programs of the installation stand in, proven to be there.
 String get installationProgramsRoot => '$installationRoot/$installationPrograms';
