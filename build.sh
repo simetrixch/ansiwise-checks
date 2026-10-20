@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-# build.sh — prove every half of this repository locally, the way the ci of
-# the master does.
+# build.sh — prove every half of this repository locally, the way scripts/check.sh
+# does before every push.
 # =============================================================================
 #
 # THIS REPOSITORY BUILDS NOTHING. It holds the criteria every gate judges by, is

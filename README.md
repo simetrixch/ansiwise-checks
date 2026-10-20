@@ -14,12 +14,7 @@ told what it checks rather than asking the disk, and one test holds the disk aga
 
 Nothing here ships. It judges the tree beside it and produces no file.
 
-`bash build.sh` proves every half of this repository on a machine, in the order the ci runs it.
+`bash build.sh` proves every half of this repository on a machine.
 
-The ci is the master's Tekton pipeline `ansiwise-checks-ci` (hostyour-cloud
-`clusters/inventories/consumer-build/templates/pipeline-ci.yaml`). On a push of the default branch or
-of a branch whose name starts with `ci/` (the Trigger `github-ci-push`, hostyour-cloud
-`clusters/inventories/image-builder/templates/triggers/github-ci-push.yaml`) it installs the Dart that
-`ci-tools.json` names and runs `scripts/check.sh`. `gate/test/checks/ci_tools_test.dart` holds that Dart
-equal to `dartVersion` in `gate/lib/src/pins.dart`. Its runs are the PipelineRuns `ansiwise-checks-ci-*`
-in the namespace `ansiwise-checks-build`, and it sets the commit status `tekton/ci`.
+`scripts/check.sh` runs on the machine before every push: the push gate of the pre-push hook runs
+it, and a red check refuses the push. No ci runs it anywhere else.

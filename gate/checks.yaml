@@ -54,5 +54,3 @@ resolved-packages: test/checks/resolved_packages_test.dart
 # The one Dart version the checks are true against is enforced by reading the gate process's own
 # version, and every other is refused with both numbers in the refusal.
 version-guard: test/checks/version_guard_test.dart
-# The Dart that ci-tools.json names, which the ci of the master installs for every check of this repository, is the Dart this gate is pinned to.
-ci-tools: test/checks/ci_tools_test.dart
