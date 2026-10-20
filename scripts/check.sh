@@ -3,8 +3,8 @@
 #
 #   ./scripts/check.sh
 #
-# One step, and a red one stops the run: build.sh proves every half of this repository, in the way
-# the ci of the master proves them. Which halves there are is read off the disk there and
+# One step, and a red one stops the run: build.sh proves every half of this repository.
+# Which halves there are is read off the disk there and
 # not repeated here, because a second spelling of them is a second thing to keep true. This file
 # exists so that every repository of this family answers to one command name, and so the push hook
 # has one thing to call.
