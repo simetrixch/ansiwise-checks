@@ -17,4 +17,5 @@ Nothing here ships. It judges the tree beside it and produces no file.
 `bash build.sh` proves every half of this repository on a machine.
 
 `scripts/check.sh` runs on the machine before every push: the push gate of the pre-push hook runs
-it, and a red check refuses the push. No ci runs it anywhere else.
+it, and a red check refuses the push. No ci runs it on a push; the release build of
+ansiwise-cli runs it once more before it builds a binary.
